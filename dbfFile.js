@@ -1,4 +1,4 @@
-var Promise = require('bluebird');
+﻿var Promise = require('bluebird');
 var fs = Promise.promisifyAll(require('fs'));
 var _ = require('lodash');
 var moment = require('moment');
@@ -165,11 +165,10 @@ var appendToDBF = async(function (dbf, records) {
                     value = '';
                 switch (field.type) {
                     case 'C':
-                        value = value.slice(0, field.size);
-                        while (value.length < field.size)
-                            value += ' ';
-                        buffer.write(value, offset, field.size, 'utf8');
-                        offset += field.size;
+                        for (var k = 0; k < field.size; ++k) {
+                            var byte = k < value.length ? value.charCodeAt(k) : 0x20;
+                            buffer.writeUInt8(byte, offset++);
+                        }
                         break;
 
                     case 'N':
