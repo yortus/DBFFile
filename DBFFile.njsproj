@@ -33,19 +33,6 @@
     <TypeScriptCompile Include="_refs.d.ts" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include=".git" />
-    <Folder Include=".git\hooks" />
-    <Folder Include=".git\info" />
-    <Folder Include=".git\objects" />
-    <Folder Include=".git\objects\41" />
-    <Folder Include=".git\objects\5a" />
-    <Folder Include=".git\objects\b9" />
-    <Folder Include=".git\objects\fc" />
-    <Folder Include=".git\objects\info" />
-    <Folder Include=".git\objects\pack" />
-    <Folder Include=".git\refs" />
-    <Folder Include=".git\refs\heads" />
-    <Folder Include=".git\refs\tags" />
     <Folder Include="typings\" />
     <Folder Include="typings\bluebird\" />
     <Folder Include="typings\lodash\" />
