@@ -11,6 +11,12 @@ var field;
 /** Represents a DBF file. */
 var DBFFile = (function () {
     function DBFFile() {
+        /** Full path to the DBF file. */
+        this.path = null;
+        /** Total number of records in the DBF file. */
+        this.recordCount = null;
+        /** Metadata for all fields defined in the DBF file. */
+        this.fields = null;
     }
     /** Append the specified records to this DBF file. */
     DBFFile.prototype.append = function (records) {

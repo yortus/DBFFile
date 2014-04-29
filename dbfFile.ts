@@ -16,13 +16,13 @@ var field: { name: string; type: string; size: number; decs: number; };
 class DBFFile {
 
     /** Full path to the DBF file. */
-    path: string;
+    path: string = null;
 
     /** Total number of records in the DBF file. */
-    recordCount: number;
+    recordCount: number = null;
 
     /** Metadata for all fields defined in the DBF file. */
-    fields: typeof field[];
+    fields: typeof field[] = null;
 
     /** Append the specified records to this DBF file. */
     append(records: any[]) {
