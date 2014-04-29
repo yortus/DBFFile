@@ -1,0 +1,33 @@
+{
+  "name": "DBFFile",
+  "version": "0.5.1",
+  "description": "",
+  "main": "dbfFile.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/paypac/DBFFile.git"
+  },
+  "keywords": [
+    "dbf",
+    "dBase"
+  ],
+  "author": {
+    "name": "Troy Gerwien",
+    "email": "yortus@gmail.com",
+    "url": "http://github.com/yortus/"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/paypac/DBFFile/issues"
+  },
+  "homepage": "https://github.com/paypac/DBFFile",
+  "dependencies": {
+    "bluebird": "~1.2.4",
+    "asyncawait": "~0.7.1",
+    "lodash": "~2.4.1",
+    "moment": "~2.6.0"
+  }
+}
