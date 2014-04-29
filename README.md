@@ -10,6 +10,6 @@ Read and write .dbf files in Node.js:
   - Reading records is ***not*** yet supported
 - Can create a new .dbf file
   - Can use field descriptors from a hash of from another instance
-  - Can append records to the .dbf file
+- Can append records to an existing .dbf file
   - Supports very large files
 - All operations are asyncronous and return a promise

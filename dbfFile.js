@@ -1,4 +1,4 @@
-﻿var Promise = require('bluebird');
+var Promise = require('bluebird');
 var fs = Promise.promisifyAll(require('fs'));
 var _ = require('lodash');
 var moment = require('moment');

@@ -5,7 +5,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{3d9f66fe-555b-4430-8a07-de9823320200}</ProjectGuid>
     <ProjectHome />
-    <ProjectView>ShowAllFiles</ProjectView>
+    <ProjectView>ProjectFiles</ProjectView>
     <StartupFile>dbfFile.js</StartupFile>
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
@@ -19,14 +19,17 @@
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
   <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
   <ItemGroup>
+    <Content Include=".gitignore" />
+    <Content Include="typings\DBFFile\DBFFile.d.ts" />
+    <Content Include="LICENSE" />
     <Content Include="package.json" />
-    <Content Include="typings\asyncawait.d.ts" />
-    <Content Include="typings\bluebird.d.ts" />
+    <Content Include="README.md" />
+    <Content Include="typings\asyncawait\asyncawait.d.ts" />
+    <Content Include="typings\bluebird\bluebird.d.ts" />
     <Content Include="typings\node\node.d.ts" />
-    <TypeScriptCompile Include="dbf-file.d.ts" />
     <TypeScriptCompile Include="dbfFile.ts" />
-    <TypeScriptCompile Include="typings\lodash.d.ts" />
-    <TypeScriptCompile Include="typings\moment.d.ts" />
+    <TypeScriptCompile Include="typings\lodash\lodash.d.ts" />
+    <TypeScriptCompile Include="typings\moment\moment.d.ts" />
     <TypeScriptCompile Include="_refs.d.ts" />
   </ItemGroup>
   <ItemGroup>
@@ -44,6 +47,11 @@
     <Folder Include=".git\refs\heads" />
     <Folder Include=".git\refs\tags" />
     <Folder Include="typings\" />
+    <Folder Include="typings\bluebird\" />
+    <Folder Include="typings\lodash\" />
+    <Folder Include="typings\moment\" />
+    <Folder Include="typings\asyncawait\" />
+    <Folder Include="typings\DBFFile\" />
     <Folder Include="typings\node\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
