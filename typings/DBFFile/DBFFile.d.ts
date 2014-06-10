@@ -16,11 +16,11 @@ declare module "DBFFile" {
         /** Append the specified records to this DBF file. */
         append(records: any[]): Promise<DBFFile>;
 
-        /** read rows from a stream of the dbf file. **/
-        readAllRecords(): Promise<any[]>;
+        /** Close this DBF file. */
+        close();
 
         /** read some specific rows from the dbf file. **/
-        readRecords(skipRows: number, getRows: number): Promise<any[]>;
+        readRecords(maxRows?: number): Promise<any[]>;
 
         /** Open an existing DBF file. */
         static open(path: string): Promise<DBFFile>;
