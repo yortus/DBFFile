@@ -1,4 +1,4 @@
-var Promise = require('bluebird');
+﻿var Promise = require('bluebird');
 var fs = Promise.promisifyAll(require('fs'));
 var _ = require('lodash');
 var moment = require('moment');
@@ -23,13 +23,13 @@ var DBFFile = (function () {
         return appendToDBF(this, records);
     };
 
-    /** Read a subset of records from this DBF file */
+    /** Read a subset of records from this DBF file. */
     DBFFile.prototype.readRecords = function (maxRows) {
         if (typeof maxRows === "undefined") { maxRows = 10000000; }
         return readRecordsFromDBF(this, maxRows);
     };
 
-    /** Close the file */
+    /** Close the file. */
     DBFFile.prototype.close = function () {
         if (this._fd) {
             fs.closeSync(this._fd);
@@ -51,7 +51,6 @@ var DBFFile = (function () {
 
 //-------------------- Private implementation starts here --------------------
 var openDBF = async(function (path) {
-    //debugger;
     // Open the file and create a buffer to read through.
     var fd = await(fs.openAsync(path, 'r'));
     var buffer = new Buffer(32);
@@ -75,7 +74,6 @@ var openDBF = async(function (path) {
         fields.push(field);
     }
 
-    //debugger;
     // Parse the header terminator
     await(fs.readAsync(fd, buffer, 0, 1, ((fields.length + 1) * 32)));
 
@@ -85,6 +83,7 @@ var openDBF = async(function (path) {
     result.recordCount = recordCount;
     result.fields = fields;
     result._fd = fd;
+    result._recordsRead = 0;
     return result;
 });
 
@@ -262,42 +261,46 @@ function parseDbfField(value, field) {
 var readRecordsFromDBF = async(function (dbf, maxRows) {
     var starttime = new Date();
     var d = new Promise(function (resolve, reject) {
-        var rowarray = [];
-
         // Create a buffer to read through.
+        var rowsInBuffer = 1000;
         var recordLength = calcRecordLength(dbf.fields);
-        var buffer = new Buffer(recordLength + 4);
+        var buffer = new Buffer(recordLength * rowsInBuffer);
 
-        for (var i = 0; i <= maxRows; i++) {
-            //console.log(i);
-            await(fs.readAsync(dbf._fd, buffer, 0, recordLength, null));
-            if (buffer[0] === 0x1a)
+        //TODO: doc...
+        var rows = [];
+        debugger;
+        while (true) {
+            // Work out how many rows to read.
+            var maxRows1 = dbf.recordCount - dbf._recordsRead;
+            var maxRows2 = maxRows - rows.length;
+            var rowsToRead = maxRows1 < maxRows2 ? maxRows1 : maxRows2;
+            if (rowsToRead > rowsInBuffer)
+                rowsToRead = rowsInBuffer;
+
+            // Quit when no more rows to read.
+            if (rowsToRead === 0)
                 break;
 
-            var chunk = buffer;
+            // Read the rows into the buffer.
+            await(fs.readAsync(dbf._fd, buffer, 0, recordLength * rowsToRead, null));
 
-            var row = {};
-            var offset = 0;
-            for (var j = 0; j < dbf.fields.length; ++j) {
-                var field = dbf.fields[j];
-                var value = chunk.toString().substring(offset + 1, offset + field.size + 1);
+            for (var i = 0; i < rowsToRead; ++i) {
+                // Parse the row.
+                var row = {};
+                var offset = 1;
+                var record = buffer.toString('utf8', i * recordLength, (i + 1) * recordLength);
+                for (var j = 0; j < dbf.fields.length; ++j) {
+                    var field = dbf.fields[j];
+                    var value = record.substring(offset, offset + field.size);
+                    var typedvalue = parseDbfField(value, field);
+                    row[field.name] = typedvalue;
+                    offset += field.size;
+                }
 
-                //console.log(value);
-                var typedvalue = parseDbfField(value, field);
-
-                row[field.name] = typedvalue;
-
-                offset += field.size;
+                //add the row to the array
+                rows.push(row);
             }
-
-            //console.log('row='+JSON.stringify(row));
-            //add the row to the array
-            rowarray.push(row);
-
-            //if we are processing a LARGE file, provide some console output occasionally
-            if (rowarray.length % 100000 == 0)
-                console.log(rowarray.length);
-            //});
+            dbf._recordsRead += rowsToRead;
         }
 
         //console.log('after for');
@@ -305,8 +308,7 @@ var readRecordsFromDBF = async(function (dbf, maxRows) {
         var seconds = (endtime.getTime() - starttime.getTime()) / 1000;
         console.log('processed in: ' + seconds + 's');
 
-        //console.log('rowarray=' + JSON.stringify(rowarray));
-        resolve(rowarray);
+        resolve(rows);
     });
     return d;
 });
