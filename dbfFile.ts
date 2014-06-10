@@ -29,6 +29,14 @@ class DBFFile {
         return appendToDBF(this, records);
     }
 
+    /** Read all the records from this DBF file. */
+    readAllRecords() {
+        return ReadAllRecordsFromDBF(this);
+    }
+    /** Read a subset of records from this DBF file */
+    readRecords(skipRows: number, getRows: number) {
+        return ReadRecordsFromDBF(this, skipRows, getRows);
+    }
     /** Open an existing DBF file. */
     static open(path: string) {
         return openDBF(path);
@@ -149,11 +157,11 @@ var createDBF = async ((path: string, fields: typeof field[]): DBFFile => {
 });
 
 
-var appendToDBF = async ((dbf: DBFFile, records: any[]) => {
+var appendToDBF = async((dbf: DBFFile, records: any[]) => {
     try {
 
         // Open the file and create a buffer to read and write through.
-        var fd = await (fs.openAsync(dbf.path, 'r+'));
+        var fd = await(fs.openAsync(dbf.path, 'r+'));
         var recordLength = calcRecordLength(dbf.fields);
         var buffer = new Buffer(recordLength + 4);
 
@@ -162,7 +170,7 @@ var appendToDBF = async ((dbf: DBFFile, records: any[]) => {
         var eofPos = headerLength + dbf.recordCount * recordLength;
 
         // Seek to the EOF position to begin writing.
-        await (fs.readAsync(fd, buffer, 0, 1, eofPos - 1));
+        await(fs.readAsync(fd, buffer, 0, 1, eofPos - 1));
 
         // Write the records.
         for (var i = 0; i < records.length; ++i) {
@@ -190,7 +198,7 @@ var appendToDBF = async ((dbf: DBFFile, records: any[]) => {
                     case 'N': // Number
                         value = value.toString();
                         value = value.slice(0, field.size);
-                        while (value.length < field.size) value  = ' ' + value;
+                        while (value.length < field.size) value = ' ' + value;
                         buffer.write(value, offset, field.size, 'utf8');
                         offset += field.size;
                         break;
@@ -209,17 +217,17 @@ var appendToDBF = async ((dbf: DBFFile, records: any[]) => {
                         throw new Error("Type '" + field.type + "' is not supported");
                 }
             }
-            await (fs.writeAsync(fd, buffer, 0, recordLength, null));
+            await(fs.writeAsync(fd, buffer, 0, recordLength, null));
         }
 
         // Write a new EOF marker.
         buffer.writeUInt8(0x1A, 0);
-        await (fs.writeAsync(fd, buffer, 0, 1, null));
+        await(fs.writeAsync(fd, buffer, 0, 1, null));
 
         // Update the record count in the file and in the DBFFile instance.
         dbf.recordCount += records.length;
         buffer.writeInt32LE(dbf.recordCount, 0);
-        await (fs.writeAsync(fd, buffer, 0, 4, 0x04));
+        await(fs.writeAsync(fd, buffer, 0, 4, 0x04));
 
         // Return the same DBFFile instance.
         return dbf;
@@ -227,9 +235,159 @@ var appendToDBF = async ((dbf: DBFFile, records: any[]) => {
     finally {
 
         // Close the file.
-        if (fd) await (fs.closeAsync(fd));
+        if (fd) await(fs.closeAsync(fd));
     }
 });
+
+
+function parseDbfField(value, field) {
+    var typedvalue;
+    if (value === null || typeof value === 'undefined') typedvalue = '';
+
+    switch (field.type) {
+
+        case 'C': // Text
+            typedvalue = value.trim();
+            break;
+
+        case 'N': // Number
+            typedvalue = parseFloat(value);
+            break;
+
+        case 'L': // Boolean
+            typedvalue = (value === 'T');
+            //buffer.writeUInt8(value ? 0x54/* 'T' */ : 0x46/* 'F' */, offset++);
+            break;
+
+        case 'D': // Date
+            //todo
+            typedvalue = (value.trim().length == 0) ? null : moment(value, "YYYYMMDD").toDate();
+            break;
+
+        default:
+            throw new Error("Type '" + field.type + "' is not supported");
+    }
+    return typedvalue;
+}
+
+var ReadRecordsFromDBF = async((dbf: DBFFile, skipRows: number, getRows: number) => {
+
+
+    var starttime = new Date();
+    var d = new Promise((resolve: (any) => {}, reject) => {
+
+        var rowarray = [];
+
+        // Open the file and create a buffer to read and through.
+        var fd = await(fs.openAsync(dbf.path, 'r'));
+        var recordLength = calcRecordLength(dbf.fields);
+        var headerLength = 33 + (dbf.fields.length * 32);
+        var buffer = new Buffer(recordLength + 4);
+
+        var fileoffset = headerLength + (recordLength * skipRows);
+        /*console.log('offset=' + fileoffset);
+        console.log('dbf.recordCount=' + dbf.recordCount);
+        console.log('fd=' + fd);
+        */
+
+        for (var i = 0; i <= getRows; i++) {
+            //console.log(i);
+            await(fs.readAsync(fd, buffer, 0, recordLength, fileoffset));
+            var chunk = buffer;
+                if (chunk != null) {
+                    var row = {};
+                    var offset = 0;
+                    for (var j = 0; j < dbf.fields.length; ++j) {
+
+                        var field = dbf.fields[j];
+                        var value = chunk.toString().substring(offset + 1, offset + field.size + 1);
+                        //console.log(value);
+                        var typedvalue = parseDbfField(value, field);
+
+                        row[field.name] = typedvalue;
+
+                        offset += field.size;
+                    }
+                    //console.log('row='+JSON.stringify(row));
+                    //add the row to the array
+                    rowarray.push(row);
+
+
+                    //if we are processing a LARGE file, provide some console output occasionally
+                    if (rowarray.length % 100000 == 0) console.log(rowarray.length);
+
+                    fileoffset += recordLength;
+                }
+                else
+                    console.log('chunk == null');
+            //});
+        }
+        var endtime = new Date();
+        var seconds = (endtime.getTime() - starttime.getTime()) / 1000;
+        console.log('processed in: ' + seconds + 's');
+        //console.log('rowarray=' + JSON.stringify(rowarray));
+        resolve(rowarray);
+    });
+    return d;
+});
+
+var ReadAllRecordsFromDBF = async((dbf: DBFFile) => {
+
+    var starttime = new Date();
+    var d = new Promise((resolve: (any) => {}, reject) => {
+
+        var rowarray = [];
+        var readable = fs.createReadStream(dbf.path);
+
+        // Compute the current beginning of data
+        var headerLength = 33 + (dbf.fields.length * 32);
+        var recordLength = calcRecordLength(dbf.fields);
+        var fileoffset = 0;
+        
+        //set an event handler
+        readable.on('readable', async(() => {
+            //if we are at the beginning of the file, skip the header
+            if (fileoffset == 0) {
+                var header = (readable.read(headerLength));
+                fileoffset += headerLength;
+            }
+            var chunk;
+            while (null !== (chunk = readable.read(recordLength))) {
+                //keep note of our place in the file
+                fileoffset += recordLength;
+
+                var offset = 1;
+                var row = {};
+
+                for (var j = 0; j < dbf.fields.length; ++j) {
+
+                    var field = dbf.fields[j];
+                    var value = chunk.toString().substring(offset + 1, offset + field.size + 1);
+
+                    var typedvalue = parseDbfField(value, field);
+
+                    row[field.name] = typedvalue;
+
+                    offset += field.size;
+                }
+                //add the row to the array
+                rowarray.push(row);
+                //if we are processing a LARGE file, provide some console output occasionally
+                if(rowarray.length % 100000 == 0) console.log(rowarray.length);
+            }
+        }));
+        //when we're done reading all the rows, return the array
+        readable.on('end', async(() => {
+            var endtime = new Date();
+            var seconds = (endtime.getTime() - starttime.getTime()) / 1000;
+            console.log('processed in: ' + seconds + 's');
+            resolve(rowarray);
+        }));
+    });
+
+    return d;
+});
+
 
 
 function validateFields(fields: typeof field[]): void {
