@@ -311,7 +311,7 @@ var readRecordsFromDBF = async((dbf: DBFFile, maxRows: number) => {
                 // Parse the row.
                 var row = {};
                 var offset = 1;
-                var record = buffer.toString('utf8', i * recordLength, (i + 1) * recordLength);
+                var record = buffer.toString('utf8', i * recordLength+1, (i + 1) * recordLength + 1);
                 for (var j = 0; j < dbf.fields.length; ++j) {
                     var field = dbf.fields[j];
                     var value = record.substring(offset, offset + field.size);
