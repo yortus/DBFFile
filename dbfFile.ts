@@ -292,7 +292,6 @@ var readRecordsFromDBF = async((dbf: DBFFile, maxRows: number) => {
 
         //TODO: doc...
         var rows = [];
-        debugger;
         while (true) {
 
             // Work out how many rows to read.
