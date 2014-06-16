@@ -1,5 +1,5 @@
 {
-  "name": "DBFFile",
+  "name": "dbffile",
   "version": "0.6.0",
   "description": "",
   "main": "dbfFile.js",
