@@ -1,7 +1,7 @@
 ﻿///<reference path="../bluebird/bluebird.d.ts" />
 
 
-declare module "DBFFile" {
+declare module "dbffile" {
     class DBFFile {
 
         /** Full path to the DBF file. */
