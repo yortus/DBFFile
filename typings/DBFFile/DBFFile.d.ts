@@ -16,9 +16,6 @@ declare module "DBFFile" {
         /** Append the specified records to this DBF file. */
         append(records: any[]): Promise<DBFFile>;
 
-        /** Close this DBF file. */
-        close();
-
         /** read some specific rows from the dbf file. **/
         readRecords(maxRows?: number): Promise<any[]>;
 

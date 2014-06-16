@@ -1,4 +1,5 @@
 import _refs = require('_refs');
+import assert = require('assert');
 import Promise = require('bluebird');
 var fs: any = Promise.promisifyAll(require('fs'));
 import _ = require('lodash');
@@ -34,66 +35,72 @@ class DBFFile {
         return readRecordsFromDBF(this, maxRows);
     }
 
-    /** Close the file. */
-    close() {
-        if (this._fd) {
-            fs.closeSync(this._fd);
-            this._fd = null;
-        }
-    }
-
     /** Open an existing DBF file. */
     static open(path: string) {
         return openDBF(path);
     }
 
-    /** Creates a new DBF file with no records. */
+    /** Create a new DBF file with no records. */
     static create(path: string, fields: typeof field[]) {
         return createDBF(path, fields);
     }
     
     // Private.
-    _fd: any;
     _recordsRead: number;
+    _filePos: number;
 }
 
 
 //-------------------- Private implementation starts here --------------------
 var openDBF = async ((path: string): DBFFile => {
+    try {
 
-    // Open the file and create a buffer to read through.
-    var fd = await (fs.openAsync(path, 'r'));
-    var buffer = new Buffer(32);
+        // Open the file and create a buffer to read through.
+        var fd = await (fs.openAsync(path, 'r'));
+        var buffer = new Buffer(32);
 
-    // Get the number of records.
-    await (fs.readAsync(fd, buffer, 0, 32, 0));
-    var recordCount = buffer.readInt32LE(4);
+        // Get the number of records.
+        await (fs.readAsync(fd, buffer, 0, 32, 0));
+        var recordCount = buffer.readInt32LE(4);
 
-    // Parse all field descriptors.
-    var fields = [];
-    while (true) {
-        await (fs.readAsync(fd, buffer, 0, 32, null));
-        if (buffer.readUInt8(0) === 0x0D) break;
-        var field = {
-            name: buffer.toString('utf8', 0, 10).split('\0')[0],
-            type: String.fromCharCode(buffer[0x0B]),
-            size: buffer.readUInt8(0x10),
-            decs: buffer.readUInt8(0x11)
-        };
-        fields.push(field);
+        // Parse all field descriptors.
+        var fields = [];
+        while (true) {
+            await (fs.readAsync(fd, buffer, 0, 32, null));
+            if (buffer.readUInt8(0) === 0x0D) break;
+            var field = {
+                name: buffer.toString('utf8', 0, 10).split('\0')[0],
+                type: String.fromCharCode(buffer[0x0B]),
+                size: buffer.readUInt8(0x10),
+                decs: buffer.readUInt8(0x11)
+            };
+            fields.push(field);
+        }
+
+        // Parse the header terminator.
+        var startOfData = 32 + (fields.length * 32) + 1;
+        await (fs.readAsync(fd, buffer, 0, 2, startOfData - 1));
+        assert(buffer[0] === 0x0d, 'Invalid DBF: Expected header terminator');
+
+        // There may be a null byte after the header terminator (observed in many DBFs).
+        // An explanation for the presence of this byte could not be found.
+        // Skip over it if found.
+        if (buffer[1] === 0) ++startOfData;
+
+        // Return a new DBFFile instance.
+        var result = new DBFFile();
+        result.path = path;
+        result.recordCount = recordCount;
+        result.fields = fields;
+        result._recordsRead = 0;
+        result._filePos = startOfData;
+        return result;
     }
+    finally {
 
-    // Parse the header terminator
-    await (fs.readAsync(fd, buffer, 0, 1, ((fields.length + 1) * 32)));
-
-    // Return a new DBFFile instance.
-    var result = new DBFFile();
-    result.path = path;
-    result.recordCount = recordCount;
-    result.fields = fields;
-    result._fd = fd;
-    result._recordsRead = 0;
-    return result;
+        // Close the file.
+        if (fd) await (fs.closeAsync(fd));
+    }
 });
 
 
@@ -164,11 +171,11 @@ var createDBF = async ((path: string, fields: typeof field[]): DBFFile => {
 });
 
 
-var appendToDBF = async((dbf: DBFFile, records: any[]) => {
+var appendToDBF = async ((dbf: DBFFile, records: any[]) => {
     try {
 
         // Open the file and create a buffer to read and write through.
-        var fd = await(fs.openAsync(dbf.path, 'r+'));
+        var fd = await (fs.openAsync(dbf.path, 'r+'));
         var recordLength = calcRecordLength(dbf.fields);
         var buffer = new Buffer(recordLength + 4);
 
@@ -177,7 +184,7 @@ var appendToDBF = async((dbf: DBFFile, records: any[]) => {
         var eofPos = headerLength + dbf.recordCount * recordLength;
 
         // Seek to the EOF position to begin writing.
-        await(fs.readAsync(fd, buffer, 0, 1, eofPos - 1));
+        await (fs.readAsync(fd, buffer, 0, 1, eofPos - 1));
 
         // Write the records.
         for (var i = 0; i < records.length; ++i) {
@@ -187,16 +194,30 @@ var appendToDBF = async((dbf: DBFFile, records: any[]) => {
             validateRecord(dbf.fields, record);
             var offset = 0;
             buffer.writeUInt8(0x20, offset++); // Record deleted flag
+
+            // Write each field in the record.
             for (var j = 0; j < dbf.fields.length; ++j) {
 
-                // Write one field, according to its type.
+                // Get the field's value.
                 var field = dbf.fields[j];
                 var value = records[i][field.name];
                 if (value === null || typeof value === 'undefined') value = '';
+
+                // Use raw data if provided in the record.
+                var raw = records[i]._raw && records[i]._raw[field.name];
+                if (raw && Buffer.isBuffer(raw) && raw.length === field.size) {
+                    raw.copy(buffer, offset);
+                    offset += field.size;
+                    continue;
+                }
+
+                // Encode the field in the buffer, according to its type.
                 switch (field.type) {
 
                     case 'C': // Text
                         for (var k = 0; k < field.size; ++k) {
+                            //TEMP testing... treat string as octets, not utf8/ascii
+                            //var byte = k < value.length ? value[k] : 0x20;
                             var byte = k < value.length ? value.charCodeAt(k) : 0x20;
                             buffer.writeUInt8(byte, offset++);
                         }
@@ -224,17 +245,17 @@ var appendToDBF = async((dbf: DBFFile, records: any[]) => {
                         throw new Error("Type '" + field.type + "' is not supported");
                 }
             }
-            await(fs.writeAsync(fd, buffer, 0, recordLength, null));
+            await (fs.writeAsync(fd, buffer, 0, recordLength, null));
         }
 
         // Write a new EOF marker.
         buffer.writeUInt8(0x1A, 0);
-        await(fs.writeAsync(fd, buffer, 0, 1, null));
+        await (fs.writeAsync(fd, buffer, 0, 1, null));
 
         // Update the record count in the file and in the DBFFile instance.
         dbf.recordCount += records.length;
         buffer.writeInt32LE(dbf.recordCount, 0);
-        await(fs.writeAsync(fd, buffer, 0, 4, 0x04));
+        await (fs.writeAsync(fd, buffer, 0, 4, 0x04));
 
         // Return the same DBFFile instance.
         return dbf;
@@ -242,59 +263,34 @@ var appendToDBF = async((dbf: DBFFile, records: any[]) => {
     finally {
 
         // Close the file.
-        if (fd) await(fs.closeAsync(fd));
+        if (fd) await (fs.closeAsync(fd));
     }
 });
 
 
-function parseDbfField(value, field) {
-    var typedvalue;
-    if (value === null || typeof value === 'undefined') typedvalue = '';
-
-    switch (field.type) {
-
-        case 'C': // Text
-            typedvalue = value.trim();
-            break;
-
-        case 'N': // Number
-            typedvalue = parseFloat(value);
-            break;
-
-        case 'L': // Boolean
-            typedvalue = (value === 'T');
-            //buffer.writeUInt8(value ? 0x54/* 'T' */ : 0x46/* 'F' */, offset++);
-            break;
-
-        case 'D': // Date
-            //todo
-            typedvalue = (value.trim().length == 0) ? null : moment(value, "YYYYMMDD").toDate();
-            break;
-
-        default:
-            throw new Error("Type '" + field.type + "' is not supported");
-    }
-    return typedvalue;
-}
-
-var readRecordsFromDBF = async((dbf: DBFFile, maxRows: number) => {
+var readRecordsFromDBF = async ((dbf: DBFFile, maxRows: number) => {
 
 
+    //TODO:...
     var starttime = new Date();
-    var d = new Promise((resolve: (any) => {}, reject) => {
 
-        // Create a buffer to read through.
+
+    try {
+
+        // Open the file and create a buffer to read through.
+        var fd = await (fs.openAsync(dbf.path, 'r'));
         var rowsInBuffer = 1000;
         var recordLength = calcRecordLength(dbf.fields);
         var buffer = new Buffer(recordLength * rowsInBuffer);
 
+        // Create a convenience function for extracting strings form the buffer.
+        var substr = (start, count) => buffer.toString('utf8', start, start + count);
 
-
-        //TODO: doc...
+        // Read rows in chunks, until enough rows have been read.
         var rows = [];
         while (true) {
 
-            // Work out how many rows to read.
+            // Work out how many rows to read in this chunk.
             var maxRows1 = dbf.recordCount - dbf._recordsRead;
             var maxRows2 = maxRows - rows.length;
             var rowsToRead = maxRows1 < maxRows2 ? maxRows1 : maxRows2;
@@ -303,43 +299,76 @@ var readRecordsFromDBF = async((dbf: DBFFile, maxRows: number) => {
             // Quit when no more rows to read.
             if (rowsToRead === 0) break;
 
-            // Read the rows into the buffer.
-            await (fs.readAsync(dbf._fd, buffer, 0, recordLength * rowsToRead, null));
+            // Read the chunk of rows into the buffer.
+            await (fs.readAsync(fd, buffer, 0, recordLength * rowsToRead, dbf._filePos));
+            dbf._recordsRead += rowsToRead;
+            dbf._filePos += recordLength * rowsToRead;
 
-            for (var i = 0; i < rowsToRead; ++i) {
+            // Parse each row.
+            for (var i = 0, offset = 0; i < rowsToRead; ++i) {
+                var row = { _raw: {} };
+                var isDeleted = (buffer[offset++] === 0x2a);
+                if (isDeleted) { offset += recordLength - 1; continue; }
 
-                // Parse the row.
-                var row = {};
-                var offset = 1;
-                var record = buffer.toString('utf8', i * recordLength+1, (i + 1) * recordLength + 1);
+                // Parse each field.
                 for (var j = 0; j < dbf.fields.length; ++j) {
                     var field = dbf.fields[j];
-                    var value = record.substring(offset, offset + field.size);
-                    var typedvalue = parseDbfField(value, field);
-                    row[field.name] = typedvalue;
-                    offset += field.size;
+                    var len = field.size, value: any = null;
+
+                    // Keep raw buffer data for each field value.
+                    row._raw[field.name] = buffer.slice(offset, offset + field.size);
+
+                    // Decode the field from the buffer, according to its type.
+                    switch (field.type) {
+                        case 'C': // Text
+                            while (len > 0 && buffer[offset + len - 1] === 0x20) --len;
+                            value = substr(offset, len);
+                            offset += field.size;
+                            break;
+                        case 'N': // Number
+                            while (len > 0 && buffer[offset] === 0x20) ++offset, --len;
+                            value = len > 0 ? parseFloat(substr(offset, len)) : null;
+                            offset += len;
+                            break;
+                        case 'L': // Boolean
+                            var c = String.fromCharCode(buffer[offset++]);
+                            value = 'TtYy'.indexOf(c) >= 0 ? true : ('FfNn'.indexOf(c) >= 0 ? false : null);
+                            break;
+                        case 'D': // Date
+                            value = buffer[offset] === 0x20 ? null : moment(substr(offset, 8), "YYYYMMDD").toDate();
+                            offset += 8;
+                            break;
+                        default:
+                            throw new Error("Type '" + field.type + "' is not supported");
+                    }
+                    row[field.name] = value;
                 }
 
-                //add the row to the array
+                //add the row to the result.
                 rows.push(row);
             }
-            dbf._recordsRead += rowsToRead;
+
+            // Allocate a new buffer, so that all the raw buffer slices created above arent't invalidated.
+            var buffer = new Buffer(recordLength * rowsInBuffer);
         }
 
-        //console.log('after for');
+        // Return all the rows that were read.
+        return rows;
+    }
+    finally {
+
+        // Close the file.
+        if (fd) await (fs.closeAsync(fd));
+
+
+
+        //TODO:...
         var endtime = new Date();
         var seconds = (endtime.getTime() - starttime.getTime()) / 1000;
         console.log('processed in: ' + seconds + 's');
 
-
-
-        resolve(rows);
-    });
-    return d;
+    }
 });
-
-
-
 
 
 function validateFields(fields: typeof field[]): void {
