@@ -49,9 +49,10 @@ var openDBF = async(function (path) {
         var fd = await(fs.openAsync(path, 'r'));
         var buffer = new Buffer(32);
 
-        // Get the number of records.
+        // Get the number of records and the header length.
         await(fs.readAsync(fd, buffer, 0, 32, 0));
         var recordCount = buffer.readInt32LE(4);
+        var headerLength = buffer.readInt16LE(8);
 
         // Parse all field descriptors.
         var fields = [];
@@ -69,15 +70,8 @@ var openDBF = async(function (path) {
         }
 
         // Parse the header terminator.
-        var startOfData = 32 + (fields.length * 32) + 1;
-        await(fs.readAsync(fd, buffer, 0, 2, startOfData - 1));
+        await(fs.readAsync(fd, buffer, 0, 1, 32 + (fields.length * 32)));
         assert(buffer[0] === 0x0d, 'Invalid DBF: Expected header terminator');
-
-        // There may be a null byte after the header terminator (observed in many DBFs).
-        // An explanation for the presence of this byte could not be found.
-        // Skip over it if found.
-        if (buffer[1] === 0)
-            ++startOfData;
 
         // Return a new DBFFile instance.
         var result = new DBFFile();
@@ -85,7 +79,7 @@ var openDBF = async(function (path) {
         result.recordCount = recordCount;
         result.fields = fields;
         result._recordsRead = 0;
-        result._filePos = startOfData;
+        result._headerLength = headerLength;
         return result;
     } finally {
         // Close the file.
@@ -110,7 +104,8 @@ var createDBF = async(function (path, fields) {
         buffer.writeUInt8(now.getMonth(), 0x02); // MM
         buffer.writeUInt8(now.getDate(), 0x03); // DD
         buffer.writeInt32LE(0, 0x04); // Number of records (set to zero)
-        buffer.writeUInt16LE(33 + (fields.length * 32), 0x08); // Length of header structure
+        var headerLength = 34 + (fields.length * 32);
+        buffer.writeUInt16LE(headerLength, 0x08); // Length of header structure
         buffer.writeUInt16LE(calcRecordLength(fields), 0x0A); // Length of each record
         buffer.writeUInt32LE(0, 0x0C); // Reserved/unused (set to zero)
         buffer.writeUInt32LE(0, 0x10); // Reserved/unused (set to zero)
@@ -130,7 +125,7 @@ var createDBF = async(function (path, fields) {
             buffer.writeUInt8(size, 0x10); // Field length
             buffer.writeUInt8(decs, 0x11); // Decimal count
             buffer.writeUInt16LE(0, 0x12); // Reserved (set to zero)
-            buffer.writeUInt8(0x01, 0x14); // Work area ID (always 01h)
+            buffer.writeUInt8(0x01, 0x14); // Work area ID (always 01h for dBase III)
             buffer.writeUInt16LE(0, 0x15); // Reserved (set to zero)
             buffer.writeUInt8(0, 0x17); // Flag for SET fields (set to zero)
             buffer.writeUInt32LE(0, 0x18); // Reserved (set to zero)
@@ -141,14 +136,17 @@ var createDBF = async(function (path, fields) {
 
         // Write the header terminator and EOF marker.
         buffer.writeUInt8(0x0D, 0); // Header terminator
-        buffer.writeUInt8(0x1A, 1); // EOF marker
-        await(fs.writeAsync(fd, buffer, 0, 2, null));
+        buffer.writeUInt8(0x00, 1); // Null byte (unnecessary but common, accounted for in header length)
+        buffer.writeUInt8(0x1A, 2); // EOF marker
+        await(fs.writeAsync(fd, buffer, 0, 3, null));
 
         // Return a new DBFFile instance.
         var result = new DBFFile();
         result.path = path;
         result.recordCount = 0;
         result.fields = _.cloneDeep(fields);
+        result._recordsRead = 0;
+        result._headerLength = headerLength;
         return result;
     } finally {
         // Close the file.
@@ -165,8 +163,7 @@ var appendToDBF = async(function (dbf, records) {
         var buffer = new Buffer(recordLength + 4);
 
         // Compute the current EOF position.
-        var headerLength = 33 + (dbf.fields.length * 32);
-        var eofPos = headerLength + dbf.recordCount * recordLength;
+        var eofPos = dbf._headerLength + dbf.recordCount * recordLength;
 
         // Seek to the EOF position to begin writing.
         await(fs.readAsync(fd, buffer, 0, 1, eofPos - 1));
@@ -248,17 +245,18 @@ var appendToDBF = async(function (dbf, records) {
 });
 
 var readRecordsFromDBF = async(function (dbf, maxRows) {
-    //TODO:...
-    var starttime = new Date();
-
     try  {
-        // Open the file and create a buffer to read through.
+        // Open the file and prepare to create a buffer to read through.
         var fd = await(fs.openAsync(dbf.path, 'r'));
         var rowsInBuffer = 1000;
         var recordLength = calcRecordLength(dbf.fields);
         var buffer = new Buffer(recordLength * rowsInBuffer);
 
-        // Create a convenience function for extracting strings form the buffer.
+        // Seek to the file position at which to start reading.
+        var seekPos = dbf._headerLength + recordLength * dbf._recordsRead;
+        await(fs.readAsync(fd, buffer, 0, 1, seekPos - 1));
+
+        // Create a convenience function for extracting strings from the buffer.
         var substr = function (start, count) {
             return buffer.toString('utf8', start, start + count);
         };
@@ -278,9 +276,8 @@ var readRecordsFromDBF = async(function (dbf, maxRows) {
                 break;
 
             // Read the chunk of rows into the buffer.
-            await(fs.readAsync(fd, buffer, 0, recordLength * rowsToRead, dbf._filePos));
+            await(fs.readAsync(fd, buffer, 0, recordLength * rowsToRead, null));
             dbf._recordsRead += rowsToRead;
-            dbf._filePos += recordLength * rowsToRead;
 
             for (var i = 0, offset = 0; i < rowsToRead; ++i) {
                 var row = { _raw: {} };
@@ -329,7 +326,7 @@ var readRecordsFromDBF = async(function (dbf, maxRows) {
             }
 
             // Allocate a new buffer, so that all the raw buffer slices created above arent't invalidated.
-            var buffer = new Buffer(recordLength * rowsInBuffer);
+            buffer = new Buffer(recordLength * rowsInBuffer);
         }
 
         // Return all the rows that were read.
@@ -338,11 +335,6 @@ var readRecordsFromDBF = async(function (dbf, maxRows) {
         // Close the file.
         if (fd)
             await(fs.closeAsync(fd));
-
-        //TODO:...
-        var endtime = new Date();
-        var seconds = (endtime.getTime() - starttime.getTime()) / 1000;
-        console.log('processed in: ' + seconds + 's');
     }
 });
 
