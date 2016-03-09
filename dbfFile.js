@@ -51,6 +51,9 @@ var openDBF = async(function (path) {
 
         // Get the number of records and the header length.
         await(fs.readAsync(fd, buffer, 0, 32, 0));
+        var fileVersion = buffer.readInt8(0);
+        assert(fileVersion === 0x03, 'Unknown file or file version.');
+        
         var recordCount = buffer.readInt32LE(4);
         var headerLength = buffer.readInt16LE(8);
 
