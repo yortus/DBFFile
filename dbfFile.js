@@ -103,7 +103,7 @@ var createDBF = async(function (path, fields) {
         // Write the header structure up to the field descriptors.
         buffer.writeUInt8(0x03, 0x00); // Version (set to dBase III)
         var now = new Date();
-        buffer.writeUInt8(now.getFullYear() - 1900, 0x01); // YY (year minus 1900)
+        buffer.writeUInt8(now.getFullYear() % 100, 0x01); // YY
         buffer.writeUInt8(now.getMonth(), 0x02); // MM
         buffer.writeUInt8(now.getDate(), 0x03); // DD
         buffer.writeInt32LE(0, 0x04); // Number of records (set to zero)
