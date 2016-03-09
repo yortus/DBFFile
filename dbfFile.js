@@ -87,6 +87,7 @@ var openDBF = async(function (path) {
         result.fields = fields;
         result._recordsRead = 0;
         result._headerLength = headerLength;
+        result._recordLength = recordLength;
         return result;
     } finally {
         // Close the file.
@@ -256,7 +257,7 @@ var readRecordsFromDBF = async(function (dbf, maxRows) {
         // Open the file and prepare to create a buffer to read through.
         var fd = await(fs.openAsync(dbf.path, 'r'));
         var rowsInBuffer = 1000;
-        var recordLength = calcRecordLength(dbf.fields);
+        var recordLength = dbf._recordLength;
         var buffer = new Buffer(recordLength * rowsInBuffer);
 
         // Seek to the file position at which to start reading.
