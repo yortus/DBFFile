@@ -56,6 +56,7 @@ var openDBF = async(function (path) {
         
         var recordCount = buffer.readInt32LE(4);
         var headerLength = buffer.readInt16LE(8);
+        var recordLength = buffer.readInt16LE(10);
 
         // Parse all field descriptors.
         var fields = [];
