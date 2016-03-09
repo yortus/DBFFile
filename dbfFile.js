@@ -59,8 +59,9 @@ var openDBF = async(function (path) {
 
         // Parse all field descriptors.
         var fields = [];
+        var fieldsLength = 1;
         while (true) {
-            await(fs.readAsync(fd, buffer, 0, 32, null));
+            await(fs.readAsync(fd, buffer, 0, 32, fieldsLength*32));
             if (buffer.readUInt8(0) === 0x0D)
                 break;
             var field = {
@@ -70,6 +71,9 @@ var openDBF = async(function (path) {
                 decs: buffer.readUInt8(0x11)
             };
             fields.push(field);
+            fieldsLength++;
+            
+            assert(fieldsLength*32 <= headerLength, 'Missing header terminate byte.');
         }
 
         // Parse the header terminator.
