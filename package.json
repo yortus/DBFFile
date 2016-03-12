@@ -2,9 +2,13 @@
   "name": "dbffile",
   "version": "0.6.1",
   "description": "",
-  "main": "dbfFile.js",
+  "main": "./esnextguardian.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "compile": "./node_modules/.bin/babel src --out-dir es5"
+  },
+  "jsnext:main": "./src/DFBFile.js",
+  "jspm": {
+    "main": "./es5/DFBFile.js"
   },
   "repository": {
     "type": "git",
@@ -26,9 +30,16 @@
   },
   "homepage": "https://github.com/paypac/DBFFile",
   "dependencies": {
-    "bluebird": "~1.2.4",
-    "asyncawait": "~0.7.1",
+    "babel-plugin-transform-async-to-generator": "^6.7.0",
+    "babel-plugin-transform-async-to-module-method": "^6.7.0",
+    "bluebird": "^3.3.4",
+    "esnextguardian": "^1.2.1",
     "lodash": "~2.4.1",
     "moment": "~2.6.0"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.5.1",
+    "babel-plugin-syntax-async-functions": "^6.5.0",
+    "babel-preset-es2015": "^6.5.0"
   }
 }

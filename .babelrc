@@ -1,0 +1,4 @@
+{
+  "presets": ["es2015"],
+  "plugins": ["syntax-async-functions","transform-async-to-generator", "babel-plugin-transform-async-to-module-method"]
+}
