@@ -1,54 +1,79 @@
-import _refs = require('_refs');
-import assert = require('assert');
-import Promise = require('bluebird');
+import * as assert from 'assert';
+import * as Promise from 'bluebird';
 var fs: any = Promise.promisifyAll(require('fs'));
-import _ = require('lodash');
-import moment = require('moment');
-import async = require('asyncawait/async');
-import await = require('asyncawait/await');
-export = DBFFile;
+import * as _ from 'lodash';
+import * as moment from 'moment';
+import {async, await} from 'asyncawait';
 
 
-// Structural typing for DBF field metadata (can't use interface because that would need exporting).
-var field: { name: string; type: string; size: number; decs: number; };
+
+
+
+/** Open an existing DBF file. */
+export function open(path: string) {
+    return openDBF(path);
+}
+
+
+
+
+
+/** Create a new DBF file with no records. */
+export function create(path: string, fields: Field[]) {
+    return createDBF(path, fields);
+}
+
+
+
 
 
 /** Represents a DBF file. */
-class DBFFile {
+export class DBFFile {
+
 
     /** Full path to the DBF file. */
     path: string = null;
     
+
     /** Total number of records in the DBF file. */
     recordCount: number = null;
 
+
     /** Metadata for all fields defined in the DBF file. */
-    fields: typeof field[] = null;
+    fields: Field[] = null;
+
 
     /** Append the specified records to this DBF file. */
     append(records: any[]) {
         return appendToDBF(this, records);
     }
 
+
     /** Read a subset of records from this DBF file. */
     readRecords(maxRows = 10000000) {
         return readRecordsFromDBF(this, maxRows);
     }
-
-    /** Open an existing DBF file. */
-    static open(path: string) {
-        return openDBF(path);
-    }
-
-    /** Create a new DBF file with no records. */
-    static create(path: string, fields: typeof field[]) {
-        return createDBF(path, fields);
-    }
     
+
     // Private.
     _recordsRead: number;
     _headerLength: number;
 }
+
+
+
+
+
+/** Structural typing for DBF field metadata. */
+export interface Field {
+    name: string;
+    type: string;
+    size: number;
+    decs: number;
+}
+
+
+
 
 
 //-------------------- Private implementation starts here --------------------
@@ -99,7 +124,10 @@ var openDBF = async ((path: string): DBFFile => {
 });
 
 
-var createDBF = async ((path: string, fields: typeof field[]): DBFFile => {
+
+
+
+var createDBF = async ((path: string, fields: Field[]): DBFFile => {
     try {
 
         // Validate the field metadata.
@@ -168,6 +196,9 @@ var createDBF = async ((path: string, fields: typeof field[]): DBFFile => {
         if (fd) await (fs.closeAsync(fd));
     }
 });
+
+
+
 
 
 var appendToDBF = async ((dbf: DBFFile, records: any[]) => {
@@ -266,6 +297,9 @@ var appendToDBF = async ((dbf: DBFFile, records: any[]) => {
 });
 
 
+
+
+
 var readRecordsFromDBF = async ((dbf: DBFFile, maxRows: number) => {
     try {
 
@@ -358,7 +392,10 @@ var readRecordsFromDBF = async ((dbf: DBFFile, maxRows: number) => {
 });
 
 
-function validateFields(fields: typeof field[]): void {
+
+
+
+function validateFields(fields: Field[]): void {
     if (fields.length > 2046) throw new Error('Too many fields (maximum is 2046)');
     for (var i = 0; i < fields.length; ++i) {
         var name = fields[i].name, type = fields[i].type, size = fields[i].size, decs = fields[i].decs;
@@ -379,7 +416,10 @@ function validateFields(fields: typeof field[]): void {
 }
 
 
-function validateRecord(fields: typeof field[], record: {}): void {
+
+
+
+function validateRecord(fields: Field[], record: {}): void {
     for (var i = 0; i < fields.length; ++i) {
         var name = fields[i].name, type = fields[i].type;
         var value = record[name];
@@ -402,7 +442,10 @@ function validateRecord(fields: typeof field[], record: {}): void {
 }
 
 
-function calcRecordLength(fields: typeof field[]): number {
+
+
+
+function calcRecordLength(fields: Field[]): number {
     var len = 1; // 'Record deleted flag' adds one byte
     for (var i = 0; i < fields.length; ++i) len += fields[i].size;
     return len;

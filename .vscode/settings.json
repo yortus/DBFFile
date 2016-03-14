@@ -1,0 +1,17 @@
+// Place your settings in this file to overwrite default and user settings.
+{
+	// Columns at which to show vertical rulers
+	"editor.rulers": [120],
+
+	// Configure glob patterns for excluding files and folders.
+	"files.exclude": {
+        "node_modules": true,
+		"**/.git": true,
+		"**/.DS_Store": true,
+        "**/*.njsproj": true,
+        "**/*.sln": true
+	},
+
+	// Specifies the folder path containing the tsserver and lib*.d.ts files to use.
+	"typescript.tsdk": "node_modules/typescript/lib"
+}

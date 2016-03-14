@@ -1,10 +1,15 @@
 {
   "name": "dbffile",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "",
-  "main": "dbfFile.js",
+  "main": "built/dbf-file.js",
+  "typings": "built/dbf-file.d.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc -p src && tsc -p test && ncp test/fixtures built/test/fixtures",
+    "clean": "rimraf built/",
+    "prepublish": "npm run self-ref && npm run build",
+    "test": "node ./scripts/run-tests",
+    "self-ref": "node ./scripts/enable-self-reference"
   },
   "repository": {
     "type": "git",
@@ -26,9 +31,16 @@
   },
   "homepage": "https://github.com/paypac/DBFFile",
   "dependencies": {
-    "bluebird": "~1.2.4",
-    "asyncawait": "~0.7.1",
-    "lodash": "~2.4.1",
-    "moment": "~2.6.0"
+    "asyncawait": "^1.0.3",
+    "bluebird": "^3.3.4",
+    "lodash": "^4.6.1",
+    "moment": "^2.12.0"
+  },
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "mocha": "^2.4.5",
+    "ncp": "^2.0.0",
+    "rimraf": "^2.5.2",
+    "typescript": "^1.8.7"
   }
 }
