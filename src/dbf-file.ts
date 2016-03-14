@@ -104,7 +104,7 @@ var openDBF = async ((path: string): DBFFile => {
         assert(fileVersion === 0x03, `File '${path}' has unknown/unsupported dBase version: ${fileVersion}.`);
 
         // Parse all field descriptors.
-        var fields = [];
+        var fields: Field[] = [];
         while (headerLength > 32 + fields.length * 32) {
             await (fs.readAsync(fd, buffer, 0, 32, 32 + fields.length * 32));
             if (buffer.readUInt8(0) === 0x0D) break;
@@ -114,6 +114,7 @@ var openDBF = async ((path: string): DBFFile => {
                 size: buffer.readUInt8(0x10),
                 decs: buffer.readUInt8(0x11)
             };
+            assert(fields.every(f => f.name !== field.name), `Duplicate field name: '${field.name}'`);
             fields.push(field);
         }
 
