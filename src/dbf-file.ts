@@ -119,7 +119,7 @@ var openDBF = async ((path: string): DBFFile => {
         }
 
         // Parse the header terminator.
-        await (fs.readAsync(fd, buffer, 0, 1, 32 + (fields.length * 32)));
+        await (fs.readAsync(fd, buffer, 0, 1, 32 + fields.length * 32));
         assert(buffer[0] === 0x0d, 'Invalid DBF: Expected header terminator');
 
         // Validate the record length.
@@ -193,14 +193,14 @@ var createDBF = async ((path: string, fields: Field[]): DBFFile => {
             buffer.writeUInt32LE(0, 0x18);                      // Reserved (set to zero)
             buffer.writeUInt32LE(0, 0x1C);                      // Reserved (set to zero)
             buffer.writeUInt8(0, 0x1F);                         // Index field flag (set to zero)
-            await (fs.writeAsync(fd, buffer, 0, 32, null));
+            await (fs.writeAsync(fd, buffer, 0, 32, 32 + i * 32));
         }
 
         // Write the header terminator and EOF marker.
         buffer.writeUInt8(0x0D, 0);                             // Header terminator
         buffer.writeUInt8(0x00, 1);                             // Null byte (unnecessary but common, accounted for in header length)
         buffer.writeUInt8(0x1A, 2);                             // EOF marker
-        await (fs.writeAsync(fd, buffer, 0, 3, null));
+        await (fs.writeAsync(fd, buffer, 0, 3, 32 + fields.length * 32));
 
         // Return a new DBFFile instance.
         var result = new DBFFile();
@@ -231,11 +231,8 @@ var appendToDBF = async ((dbf: DBFFile, records: any[]) => {
         var recordLength = calcRecordLength(dbf.fields);
         var buffer = new Buffer(recordLength + 4);
 
-        // Compute the current EOF position.
-        var eofPos = dbf._headerLength + dbf.recordCount * recordLength;
-
-        // Seek to the EOF position to begin writing.
-        await (fs.readAsync(fd, buffer, 0, 1, eofPos - 1));
+        // Calculate the file position at which to start appending.
+        var currentPosition = dbf._headerLength + dbf.recordCount * recordLength;
 
         // Write the records.
         for (var i = 0; i < records.length; ++i) {
@@ -296,12 +293,13 @@ var appendToDBF = async ((dbf: DBFFile, records: any[]) => {
                         throw new Error("Type '" + field.type + "' is not supported");
                 }
             }
-            await (fs.writeAsync(fd, buffer, 0, recordLength, null));
+            await (fs.writeAsync(fd, buffer, 0, recordLength, currentPosition));
+            currentPosition += recordLength;
         }
 
         // Write a new EOF marker.
         buffer.writeUInt8(0x1A, 0);
-        await (fs.writeAsync(fd, buffer, 0, 1, null));
+        await (fs.writeAsync(fd, buffer, 0, 1, currentPosition));
 
         // Update the record count in the file and in the DBFFile instance.
         dbf.recordCount += records.length;
