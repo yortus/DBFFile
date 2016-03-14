@@ -66,6 +66,7 @@ export class DBFFile {
     // Private.
     _recordsRead: number;
     _headerLength: number;
+    _recordLength: number;
 }
 
 
@@ -92,11 +93,12 @@ var openDBF = async ((path: string): DBFFile => {
         var fd = await (fs.openAsync(path, 'r'));
         var buffer = new Buffer(32);
 
-        // Get the file version, number of records and the header length.
+        // Read various properties from the header record.
         await (fs.readAsync(fd, buffer, 0, 32, 0));
         var fileVersion = buffer.readInt8(0);
         var recordCount = buffer.readInt32LE(4);
         var headerLength = buffer.readInt16LE(8);
+        var recordLength = buffer.readInt16LE(10);
 
         // Ensure the file version is a supported one.
         assert(fileVersion === 0x03, `File '${path}' has unknown/unsupported dBase version: ${fileVersion}.`);
@@ -119,6 +121,10 @@ var openDBF = async ((path: string): DBFFile => {
         await (fs.readAsync(fd, buffer, 0, 1, 32 + (fields.length * 32)));
         assert(buffer[0] === 0x0d, 'Invalid DBF: Expected header terminator');
 
+        // Validate the record length.
+        assert(recordLength === calcRecordLength(fields), 'Invalid DBF: Incorrect record length');
+
+
         // Return a new DBFFile instance.
         var result = new DBFFile();
         result.path = path;
@@ -126,6 +132,7 @@ var openDBF = async ((path: string): DBFFile => {
         result.fields = fields;
         result._recordsRead = 0;
         result._headerLength = headerLength;
+        result._recordLength = recordLength;
         return result;
     }
     finally {
@@ -158,7 +165,8 @@ var createDBF = async ((path: string, fields: Field[]): DBFFile => {
         buffer.writeInt32LE(0, 0x04);                           // Number of records (set to zero)
         var headerLength = 34 + (fields.length * 32);
         buffer.writeUInt16LE(headerLength, 0x08);               // Length of header structure
-        buffer.writeUInt16LE(calcRecordLength(fields), 0x0A);   // Length of each record
+        var recordLength = calcRecordLength(fields)
+        buffer.writeUInt16LE(recordLength, 0x0A);               // Length of each record
         buffer.writeUInt32LE(0, 0x0C);                          // Reserved/unused (set to zero)
         buffer.writeUInt32LE(0, 0x10);                          // Reserved/unused (set to zero)
         buffer.writeUInt32LE(0, 0x14);                          // Reserved/unused (set to zero)
@@ -200,6 +208,7 @@ var createDBF = async ((path: string, fields: Field[]): DBFFile => {
         result.fields = _.cloneDeep(fields);
         result._recordsRead = 0;
         result._headerLength = headerLength;
+        result._recordLength = recordLength;
         return result;
     }
     finally {
@@ -318,7 +327,7 @@ var readRecordsFromDBF = async ((dbf: DBFFile, maxRows: number) => {
         // Open the file and prepare to create a buffer to read through.
         var fd = await (fs.openAsync(dbf.path, 'r'));
         var rowsInBuffer = 1000;
-        var recordLength = calcRecordLength(dbf.fields);
+        var recordLength = dbf._recordLength;
         var buffer = new Buffer(recordLength * rowsInBuffer);
 
         // Seek to the file position at which to start reading.
