@@ -84,10 +84,14 @@ var openDBF = async ((path: string): DBFFile => {
         var fd = await (fs.openAsync(path, 'r'));
         var buffer = new Buffer(32);
 
-        // Get the number of records and the header length.
+        // Get the file version, number of records and the header length.
         await (fs.readAsync(fd, buffer, 0, 32, 0));
+        var fileVersion = buffer.readInt8(0);
         var recordCount = buffer.readInt32LE(4);
         var headerLength = buffer.readInt16LE(8);
+
+        // Ensure the file version is a supported one.
+        assert(fileVersion === 0x03, `File '${path}' has unknown/unsupported dBase version: ${fileVersion}`);
 
         // Parse all field descriptors.
         var fields = [];
