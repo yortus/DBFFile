@@ -331,9 +331,8 @@ var readRecordsFromDBF = async ((dbf: DBFFile, maxRows: number) => {
         var recordLength = dbf._recordLength;
         var buffer = new Buffer(recordLength * rowsInBuffer);
 
-        // Seek to the file position at which to start reading.
-        var seekPos = dbf._headerLength + recordLength * dbf._recordsRead;
-        await (fs.readAsync(fd, buffer, 0, 1, seekPos - 1));
+        // Calculate the file position at which to start reading.
+        var currentPosition = dbf._headerLength + recordLength * dbf._recordsRead;
 
         // Create a convenience function for extracting strings from the buffer.
         var substr = (start, count) => buffer.toString('utf8', start, start + count);
@@ -352,8 +351,9 @@ var readRecordsFromDBF = async ((dbf: DBFFile, maxRows: number) => {
             if (rowsToRead === 0) break;
 
             // Read the chunk of rows into the buffer.
-            await (fs.readAsync(fd, buffer, 0, recordLength * rowsToRead, null));
+            await (fs.readAsync(fd, buffer, 0, recordLength * rowsToRead, currentPosition));
             dbf._recordsRead += rowsToRead;
+            currentPosition += recordLength * rowsToRead;
 
             // Parse each row.
             for (var i = 0, offset = 0; i < rowsToRead; ++i) {
