@@ -9,6 +9,14 @@ import {async, await} from 'asyncawait';
 
 
 
+// For information about the dBase III file format, see:
+// http://www.dbf2002.com/dbf-file-format.html
+// http://www.dbase.com/KnowledgeBase/int/db7_file_fmt.htm
+
+
+
+
+
 /** Open an existing DBF file. */
 export function open(path: string) {
     return openDBF(path);
@@ -91,12 +99,12 @@ var openDBF = async ((path: string): DBFFile => {
         var headerLength = buffer.readInt16LE(8);
 
         // Ensure the file version is a supported one.
-        assert(fileVersion === 0x03, `File '${path}' has unknown/unsupported dBase version: ${fileVersion}`);
+        assert(fileVersion === 0x03, `File '${path}' has unknown/unsupported dBase version: ${fileVersion}.`);
 
         // Parse all field descriptors.
         var fields = [];
-        while (true) {
-            await (fs.readAsync(fd, buffer, 0, 32, null));
+        while (headerLength > 32 + fields.length * 32) {
+            await (fs.readAsync(fd, buffer, 0, 32, 32 + fields.length * 32));
             if (buffer.readUInt8(0) === 0x0D) break;
             var field = {
                 name: buffer.toString('utf8', 0, 10).split('\0')[0],
