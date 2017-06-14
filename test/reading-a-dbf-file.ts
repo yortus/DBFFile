@@ -1,10 +1,9 @@
 'use strict';
 import * as path from 'path';
 import * as _ from 'lodash';
-import {async, await} from 'asyncawait';
 import {expect} from 'chai';
 import * as DBFFile from 'dbffile';
-
+import {asyncTester} from './utils';
 
 describe('Reading a DBF file', () => {
 
@@ -26,7 +25,7 @@ describe('Reading a DBF file', () => {
     ];
 
     tests.forEach(test => {
-        it(test.filename, async.cps (() => {
+        it(test.filename, asyncTester(async () => {
             let filepath = path.join(__dirname, `./fixtures/${test.filename}`);
             let expectedRows = test.rowCount;
             let expectedData = test.firstRow;

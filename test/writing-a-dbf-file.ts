@@ -1,11 +1,10 @@
 'use strict';
 import * as path from 'path';
 import * as _ from 'lodash';
-import * as Promise from 'bluebird';
-var rimraf = Promise.promisify(require('rimraf'));
-import {async, await} from 'asyncawait';
+import {sync as rimraf} from 'rimraf'
 import {expect} from 'chai';
 import * as DBFFile from 'dbffile';
+import {asyncTester} from './utils';
 
 
 describe('Writing a DBF file', () => {
@@ -21,7 +20,7 @@ describe('Writing a DBF file', () => {
     rimraf(path.join(__dirname, `./fixtures/*.out`));
 
     tests.forEach(test => {
-        it(test.filename, async.cps (() => {
+        it(test.filename, asyncTester(async () => {
             let srcPath = path.join(__dirname, `./fixtures/${test.filename}`);
             let dstPath = path.join(__dirname, `./fixtures/${test.filename}.out`);
 

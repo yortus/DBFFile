@@ -1,9 +1,8 @@
 import * as assert from 'assert';
-import * as Promise from 'bluebird';
-var fs: any = Promise.promisifyAll(require('fs'));
+import * as Bluebird from 'bluebird';
+var fs: any = Bluebird.promisifyAll(require('fs'));
 import * as _ from 'lodash';
 import * as moment from 'moment';
-import {async, await} from 'asyncawait';
 
 
 
@@ -86,7 +85,7 @@ export interface Field {
 
 
 //-------------------- Private implementation starts here --------------------
-var openDBF = async ((path: string): DBFFile => {
+var openDBF = async (path: string): Promise<DBFFile> => {
     try {
 
         // Open the file and create a buffer to read through.
@@ -141,13 +140,13 @@ var openDBF = async ((path: string): DBFFile => {
         // Close the file.
         if (fd) await (fs.closeAsync(fd));
     }
-});
+};
 
 
 
 
 
-var createDBF = async ((path: string, fields: Field[]): DBFFile => {
+var createDBF = async (path: string, fields: Field[]): Promise<DBFFile> => {
     try {
 
         // Validate the field metadata.
@@ -217,13 +216,13 @@ var createDBF = async ((path: string, fields: Field[]): DBFFile => {
         // Close the file.
         if (fd) await (fs.closeAsync(fd));
     }
-});
+};
 
 
 
 
 
-var appendToDBF = async ((dbf: DBFFile, records: any[]) => {
+var appendToDBF = async (dbf: DBFFile, records: any[]): Promise<DBFFile> => {
     try {
 
         // Open the file and create a buffer to read and write through.
@@ -314,13 +313,13 @@ var appendToDBF = async ((dbf: DBFFile, records: any[]) => {
         // Close the file.
         if (fd) await (fs.closeAsync(fd));
     }
-});
+};
 
 
 
 
 
-var readRecordsFromDBF = async ((dbf: DBFFile, maxRows: number) => {
+var readRecordsFromDBF = async (dbf: DBFFile, maxRows: number) => {
     try {
 
         // Open the file and prepare to create a buffer to read through.
@@ -409,7 +408,7 @@ var readRecordsFromDBF = async ((dbf: DBFFile, maxRows: number) => {
         // Close the file.
         if (fd) await (fs.closeAsync(fd));
     }
-});
+};
 
 
 
