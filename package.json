@@ -33,7 +33,6 @@
   "dependencies": {
     "@types/bluebird": "^3.5.5",
     "@types/lodash": "^4.14.66",
-    "@types/moment": "^2.13.0",
     "@types/node": "^7.0.31",
     "bluebird": "^3.3.4",
     "lodash": "^4.6.1",
