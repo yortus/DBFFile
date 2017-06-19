@@ -4,6 +4,7 @@
         "module": "commonjs",
         "removeComments": false,
         "sourceMap": true,
-        "outDir": "../built/test"
+        "outDir": "../built/test",
+        "lib": ["dom", "es5", "scripthost", "es2015.promise"]
     }
 }

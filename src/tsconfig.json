@@ -5,6 +5,7 @@
         "removeComments": false,
         "sourceMap": true,
         "declaration": true,
-        "outDir": "../built"
+        "outDir": "../built",
+        "lib": ["dom", "es5", "scripthost", "es2015.promise"]
     }
 }
