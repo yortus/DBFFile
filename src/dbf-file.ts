@@ -386,6 +386,10 @@ var readRecordsFromDBF = async (dbf: DBFFile, maxRows: number) => {
                             value = buffer[offset] === 0x20 ? null : moment(substr(offset, 8), "YYYYMMDD").toDate();
                             offset += 8;
                             break;
+                        case 'I': // Integer
+                            value = buffer.readInt32LE(offset);
+                            offset += field.size;
+                            break;
                         default:
                             throw new Error("Type '" + field.type + "' is not supported");
                     }
