@@ -12,7 +12,17 @@ describe('Writing a DBF file', () => {
         {
             filename: 'PYACFL.DBF',
             rowCount: 15,
-            firstRow: { AFCLPD: 'W', AFHRPW: 2.92308, AFLVCL: 0.00, AFCRDA: new Date(1999, 2, 25), AFPSDS: '' }
+            addFields: [{
+                name: 'NO',
+                type: 'I',
+                size: 4,
+                decs: 0
+            }],
+            addValues: (row, i) => ({
+                ...row,
+                NO: i
+            }),
+            firstRow: { AFCLPD: 'W', AFHRPW: 2.92308, AFLVCL: 0.00, AFCRDA: new Date(1999, 2, 25), AFPSDS: '', NO: 0 },
         },
     ];
 
@@ -24,10 +34,10 @@ describe('Writing a DBF file', () => {
             let dstPath = path.join(__dirname, `./fixtures/${test.filename}.out`);
 
             let srcDbf = await (DBFFile.open(srcPath));
-            let dstDbf = await (DBFFile.create(dstPath, srcDbf.fields));
+            let dstDbf = await (DBFFile.create(dstPath, srcDbf.fields.concat(test.addFields)));
 
             let rows = await (srcDbf.readRecords(100));
-            await (dstDbf.append(rows));
+            await (dstDbf.append(rows.map(test.addValues)));
 
             dstDbf = await (DBFFile.open(dstPath));
             rows = await (dstDbf.readRecords(500));
