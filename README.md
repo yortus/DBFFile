@@ -4,7 +4,7 @@
 
 Read and write .dbf (dBase III) files in Node.js:
 
-- Supports `C` (string) , `N` (numeric) , `L` (logical) and `D` (date) field types
+- Supports `C` (string) , `N` (numeric) , `I` (integer) , `L` (logical) and `D` (date) field types
 - Can open an existing .dbf file
   - Can access all field descriptors
   - Can access total record count

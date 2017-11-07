@@ -40,7 +40,7 @@ export class DBFFile {
 
     /** Full path to the DBF file. */
     path: string = null;
-    
+
 
     /** Total number of records in the DBF file. */
     recordCount: number = null;
@@ -60,7 +60,7 @@ export class DBFFile {
     readRecords(maxRows = 10000000) {
         return readRecordsFromDBF(this, maxRows);
     }
-    
+
 
     // Private.
     _recordsRead: number;
@@ -288,6 +288,11 @@ var appendToDBF = async (dbf: DBFFile, records: any[]): Promise<DBFFile> => {
                         offset += 8;
                         break;
 
+                    case 'I': // Integer
+                        buffer.writeInt32LE(value, offset);
+                        offset += field.size;
+                        break;
+
                     default:
                         throw new Error("Type '" + field.type + "' is not supported");
                 }
@@ -386,6 +391,10 @@ var readRecordsFromDBF = async (dbf: DBFFile, maxRows: number) => {
                             value = buffer[offset] === 0x20 ? null : moment(substr(offset, 8), "YYYYMMDD").toDate();
                             offset += 8;
                             break;
+                        case 'I': // Integer
+                            value = buffer.readInt32LE(offset);
+                            offset += field.size;
+                            break;
                         default:
                             throw new Error("Type '" + field.type + "' is not supported");
                     }
@@ -424,12 +433,13 @@ function validateFields(fields: Field[]): void {
         if (decs && !_.isNumber(decs)) throw new Error('Decs must be null, or a number');
         if (name.length < 1) throw new Error("Field name '" + name + "' is too short (minimum is 1 char)");
         if (name.length > 10) throw new Error("Field name '" + name + "' is too long (maximum is 10 chars)");
-        if (['C', 'N', 'L', 'D'].indexOf(type) === -1) throw new Error("Type '" + type + "' is not supported");
+        if (['C', 'N', 'L', 'D', 'I'].indexOf(type) === -1) throw new Error("Type '" + type + "' is not supported");
         if (size < 1) throw new Error('Field size is too small (minimum is 1)');
         if (type === 'C' && size > 255) throw new Error('Field size is too large (maximum is 255)');
         if (type === 'N' && size > 20) throw new Error('Field size is too large (maximum is 20)');
         if (type === 'L' && size !== 1) throw new Error('Invalid field size (must be 1)');
         if (type === 'D' && size !== 8) throw new Error('Invalid field size (must be 8)');
+        if (type === 'I' && size !== 4) throw new Error('Invalid field size (must be 4)');
         if (decs && decs > 15) throw new Error('Decimal count is too large (maximum is 15)');
     }
 }
