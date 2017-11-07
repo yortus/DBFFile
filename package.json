@@ -1,6 +1,6 @@
 {
   "name": "dbffile",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "",
   "main": "built/dbf-file.js",
   "typings": "built/dbf-file.d.ts",
