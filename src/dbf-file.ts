@@ -277,6 +277,14 @@ var appendToDBF = async (dbf: DBFFile, records: any[]): Promise<DBFFile> => {
                         buffer.write(value, offset, field.size, 'utf8');
                         offset += field.size;
                         break;
+                        
+                    case 'F': // Float
+                        value = value.toString();
+                        value = value.slice(0, field.size);
+                        while (value.length < field.size) value = ' ' + value;
+                        buffer.write(value, offset, field.size, 'utf8');
+                        offset += field.size;
+                        break;
 
                     case 'L': // Boolean
                         buffer.writeUInt8(value ? 0x54/* 'T' */ : 0x46/* 'F' */, offset++);
@@ -383,6 +391,11 @@ var readRecordsFromDBF = async (dbf: DBFFile, maxRows: number) => {
                             value = len > 0 ? parseFloat(substr(offset, len)) : null;
                             offset += len;
                             break;
+                        case 'F': // Float
+                            while (len > 0 && buffer[offset] === 0x20) ++offset, --len;
+                            value = len > 0 ? parseFloat(substr(offset, len)) : null;
+                            offset += len;
+                            break;
                         case 'L': // Boolean
                             var c = String.fromCharCode(buffer[offset++]);
                             value = 'TtYy'.indexOf(c) >= 0 ? true : ('FfNn'.indexOf(c) >= 0 ? false : null);
@@ -433,7 +446,7 @@ function validateFields(fields: Field[]): void {
         if (decs && !_.isNumber(decs)) throw new Error('Decs must be null, or a number');
         if (name.length < 1) throw new Error("Field name '" + name + "' is too short (minimum is 1 char)");
         if (name.length > 10) throw new Error("Field name '" + name + "' is too long (maximum is 10 chars)");
-        if (['C', 'N', 'L', 'D', 'I'].indexOf(type) === -1) throw new Error("Type '" + type + "' is not supported");
+        if (['C', 'N', 'L', 'D', 'I', 'F'].indexOf(type) === -1) throw new Error("Type '" + type + "' is not supported");
         if (size < 1) throw new Error('Field size is too small (minimum is 1)');
         if (type === 'C' && size > 255) throw new Error('Field size is too large (maximum is 255)');
         if (type === 'N' && size > 20) throw new Error('Field size is too large (maximum is 20)');
