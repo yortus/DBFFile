@@ -1,5 +1,5 @@
 {
-  "name": "dbffile",
+  "name": "dbffile-float",
   "version": "0.7.3",
   "description": "",
   "main": "built/dbf-file.js",
