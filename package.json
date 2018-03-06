@@ -1,6 +1,6 @@
 {
   "name": "dbffile",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "description": "",
   "main": "built/dbf-file.js",
   "typings": "built/dbf-file.d.ts",
@@ -36,7 +36,7 @@
     "@types/node": "^7.0.31",
     "bluebird": "^3.3.4",
     "lodash": "^4.6.1",
-    "moment": "^2.12.0"
+    "moment": "^2.21.0"
   },
   "devDependencies": {
     "@types/chai": "^4.0.0",
