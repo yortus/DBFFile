@@ -1,6 +1,6 @@
 {
   "name": "@mugan86/dbffile",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "",
   "main": "built/dbf-file.js",
   "typings": "built/dbf-file.d.ts",
