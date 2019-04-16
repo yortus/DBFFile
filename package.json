@@ -1,5 +1,5 @@
 {
-  "name": "dbffile",
+  "name": "@mugan86/dbffile",
   "version": "0.7.6",
   "description": "",
   "main": "built/dbf-file.js",
@@ -18,13 +18,21 @@
   "keywords": [
     "dbf",
     "dBase",
-    "dBase III"
+    "dBase III",
+    "encoding select"
   ],
   "author": {
     "name": "Troy Gerwien",
     "email": "yortus@gmail.com",
     "url": "http://github.com/yortus/"
   },
+  "contributors": [
+    {
+      "name": "Anartz Mugika Ledo",
+      "email": "mugan86@gmail.com",
+      "url": "http://github.com/mugan86/"
+    }
+  ],
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/paypac/DBFFile/issues"

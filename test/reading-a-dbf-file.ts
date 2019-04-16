@@ -35,8 +35,8 @@ describe('Reading a DBF file', () => {
             let actualDels = null;
             let actualError = null;
             try {
-                let dbf = await (DBFFile.open(filepath));
-                let rows = await (dbf.readRecords(500));
+                let dbf = await (DBFFile.open(filepath, 'latin1'));
+                let rows = await (dbf.readRecords(500, 'latin1'));
                 actualRows = dbf.recordCount;
                 actualData = _.pick(rows[0], _.keys(expectedData));
                 actualDels = dbf.recordCount - rows.length;

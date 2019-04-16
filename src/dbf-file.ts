@@ -17,8 +17,8 @@ import * as moment from 'moment';
 
 
 /** Open an existing DBF file. */
-export function open(path: string) {
-    return openDBF(path);
+export function open(path: string, encoding: string) {
+    return openDBF(path, encoding);
 }
 
 
@@ -26,8 +26,8 @@ export function open(path: string) {
 
 
 /** Create a new DBF file with no records. */
-export function create(path: string, fields: Field[]) {
-    return createDBF(path, fields);
+export function create(path: string, fields: Field[], encoding: string) {
+    return createDBF(path, fields, encoding);
 }
 
 
@@ -51,14 +51,14 @@ export class DBFFile {
 
 
     /** Append the specified records to this DBF file. */
-    append(records: any[]) {
-        return appendToDBF(this, records);
+    append(records: any[], encoding: string) {
+        return appendToDBF(this, records, encoding);
     }
 
 
     /** Read a subset of records from this DBF file. */
-    readRecords(maxRows = 10000000) {
-        return readRecordsFromDBF(this, maxRows);
+    readRecords(maxRows = 10000000, encoding: string) {
+        return readRecordsFromDBF(this, maxRows, encoding);
     }
 
 
@@ -85,7 +85,7 @@ export interface Field {
 
 
 //-------------------- Private implementation starts here --------------------
-var openDBF = async (path: string): Promise<DBFFile> => {
+var openDBF = async (path: string, encoding: string = 'utf8'): Promise<DBFFile> => {
     try {
 
         // Open the file and create a buffer to read through.
@@ -108,7 +108,7 @@ var openDBF = async (path: string): Promise<DBFFile> => {
             await (fs.readAsync(fd, buffer, 0, 32, 32 + fields.length * 32));
             if (buffer.readUInt8(0) === 0x0D) break;
             var field = {
-                name: buffer.toString('utf8', 0, 10).split('\0')[0],
+                name: buffer.toString(encoding, 0, 10).split('\0')[0],
                 type: String.fromCharCode(buffer[0x0B]),
                 size: buffer.readUInt8(0x10),
                 decs: buffer.readUInt8(0x11)
@@ -146,7 +146,7 @@ var openDBF = async (path: string): Promise<DBFFile> => {
 
 
 
-var createDBF = async (path: string, fields: Field[]): Promise<DBFFile> => {
+var createDBF = async (path: string, fields: Field[], encoding: string = 'utf8'): Promise<DBFFile> => {
     try {
 
         // Validate the field metadata.
@@ -177,7 +177,7 @@ var createDBF = async (path: string, fields: Field[]): Promise<DBFFile> => {
         // Write the field descriptors.
         for (var i = 0; i < fields.length; ++i) {
             var name = fields[i].name, type = fields[i].type, size = fields[i].size, decs = fields[i].decs || 0;
-            buffer.write(name, 0, name.length, 'utf8');         // Field name (up to 10 chars)
+            buffer.write(name, 0, name.length, encoding);         // Field name (up to 10 chars)
             for (var j = name.length; j < 11; ++j) {            // null terminator(s)
                 buffer.writeUInt8(0, j);
             }
@@ -222,7 +222,7 @@ var createDBF = async (path: string, fields: Field[]): Promise<DBFFile> => {
 
 
 
-var appendToDBF = async (dbf: DBFFile, records: any[]): Promise<DBFFile> => {
+var appendToDBF = async (dbf: DBFFile, records: any[], encoding: string = 'utf8'): Promise<DBFFile> => {
     try {
 
         // Open the file and create a buffer to read and write through.
@@ -274,7 +274,7 @@ var appendToDBF = async (dbf: DBFFile, records: any[]): Promise<DBFFile> => {
                         value = value.toString();
                         value = value.slice(0, field.size);
                         while (value.length < field.size) value = ' ' + value;
-                        buffer.write(value, offset, field.size, 'utf8');
+                        buffer.write(value, offset, field.size, encoding);
                         offset += field.size;
                         break;
 
@@ -284,7 +284,7 @@ var appendToDBF = async (dbf: DBFFile, records: any[]): Promise<DBFFile> => {
 
                     case 'D': // Date
                         value = value ? moment(value).format('YYYYMMDD') : '        ';
-                        buffer.write(value, offset, 8, 'utf8');
+                        buffer.write(value, offset, 8, encoding);
                         offset += 8;
                         break;
 
@@ -324,7 +324,7 @@ var appendToDBF = async (dbf: DBFFile, records: any[]): Promise<DBFFile> => {
 
 
 
-var readRecordsFromDBF = async (dbf: DBFFile, maxRows: number) => {
+var readRecordsFromDBF = async (dbf: DBFFile, maxRows: number, encoding: string = 'utf8') => {
     try {
 
         // Open the file and prepare to create a buffer to read through.
@@ -337,7 +337,7 @@ var readRecordsFromDBF = async (dbf: DBFFile, maxRows: number) => {
         var currentPosition = dbf._headerLength + recordLength * dbf._recordsRead;
 
         // Create a convenience function for extracting strings from the buffer.
-        var substr = (start, count) => buffer.toString('utf8', start, start + count);
+        var substr = (start, count) => buffer.toString(encoding, start, start + count);
 
         // Read rows in chunks, until enough rows have been read.
         var rows = [];

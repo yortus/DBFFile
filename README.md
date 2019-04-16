@@ -25,7 +25,7 @@ Read and write .dbf (dBase III) files in Node.js:
 ```javascript
 var DBFFile = require('dbffile');
 
-DBFFile.open('[full path to .dbf file]')
+DBFFile.open('[full path to .dbf file]', '[encoding]')
     .then(dbf => {
         console.log(`DBF file contains ${dbf.recordCount} rows.`);
         console.log(`Field names: ${dbf.fields.map(f => f.name)}`);
@@ -50,7 +50,7 @@ var rows = [
     { fname: 'Mary', lname: 'Smith' }
 ];
 
-DBFFile.create('[full path to .dbf file]', fieldDescriptors)
+DBFFile.create('[full path to .dbf file]', fieldDescriptors, '[encoding]')
     .then(dbf => {
         console.log('DBF file created.');
         return dbf.append(rows);
@@ -86,9 +86,9 @@ class DBFFile {
     fields: { name: string; type: string; size: number; decs: number; }[];
 
     /** Append the specified records to this DBF file. */
-    append(records: any[]): Promise<DBFFile>;
+    append(records: any[], encoding: string): : Promise<DBFFile>;
 
-    /** read some specific rows from the dbf file. **/
-    readRecords(maxRows?: number): Promise<any[]>;
+    /** Read a subset of records from this DBF file. */
+    readRecords(maxRows = 10000000, encoding: string): Promise<any[]>;
 }
 ```
