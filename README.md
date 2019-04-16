@@ -20,12 +20,12 @@ Read and write .dbf (dBase III) files in Node.js:
 
 ### Installation
 
-`npm install dbffile`
+`npm install @mugan86/dbffile`
 
 ### Example: reading a .dbf file
 
 ```javascript
-var DBFFile = require('dbffile');
+var DBFFile = require('@mugan86/dbffile');
 
 DBFFile.open('[full path to .dbf file]', '[encoding]')
     .then(dbf => {
@@ -40,7 +40,7 @@ DBFFile.open('[full path to .dbf file]', '[encoding]')
 ### Example: writing a .dbf file
 
 ```javascript
-var DBFFile = require('dbffile');
+var DBFFile = require('@mugan86/dbffile');
 
 var fieldDescriptors = [
     { name: 'fname', type: 'C', size: 255 },
