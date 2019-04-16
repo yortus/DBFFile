@@ -2,8 +2,6 @@
 
 ### Summary
 
-Modification with add new feature based in [original library project](https://github.com/paypac/DBFFile) develop by [paypac](https://github.com/paypac)
-
 Read and write .dbf (dBase III) files in Node.js:
 
 - Supports `C` (string) , `N` (numeric) , `I` (integer) , `L` (logical) and `D` (date) field types
@@ -20,12 +18,12 @@ Read and write .dbf (dBase III) files in Node.js:
 
 ### Installation
 
-`npm install @mugan86/dbffile`
+`npm install dbffile`
 
 ### Example: reading a .dbf file
 
 ```javascript
-var DBFFile = require('@mugan86/dbffile');
+var DBFFile = require('dbffile');
 
 DBFFile.open('[full path to .dbf file]', '[encoding]')
     .then(dbf => {
@@ -40,7 +38,7 @@ DBFFile.open('[full path to .dbf file]', '[encoding]')
 ### Example: writing a .dbf file
 
 ```javascript
-var DBFFile = require('@mugan86/dbffile');
+var DBFFile = require('dbffile');
 
 var fieldDescriptors = [
     { name: 'fname', type: 'C', size: 255 },

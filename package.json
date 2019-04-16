@@ -1,7 +1,7 @@
 {
-  "name": "@mugan86/dbffile",
+  "name": "dbffile",
   "version": "0.8.2",
-  "description": "",
+  "description": "DBF files manage library with diferents encodings",
   "main": "built/dbf-file.js",
   "typings": "built/dbf-file.d.ts",
   "scripts": {
