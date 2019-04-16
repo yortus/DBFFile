@@ -2,6 +2,8 @@
 
 ### Summary
 
+Modification with add new feature based in [original library project](https://github.com/paypac/DBFFile) develop by [paypac](https://github.com/paypac)
+
 Read and write .dbf (dBase III) files in Node.js:
 
 - Supports `C` (string) , `N` (numeric) , `I` (integer) , `L` (logical) and `D` (date) field types
