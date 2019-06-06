@@ -18,7 +18,7 @@ Read and write .dbf (dBase III) files in Node.js:
 
 ### Installation
 
-`npm install dbffile`
+`npm install dbffile` or `yarn add dbffile`
 
 ### Example: reading a .dbf file
 

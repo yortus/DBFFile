@@ -1,6 +1,5 @@
 import * as assert from 'assert';
-import * as Bluebird from 'bluebird';
-var fs: any = Bluebird.promisifyAll(require('fs'));
+import * as fs from './fs';
 import * as _ from 'lodash';
 import * as moment from 'moment';
 
@@ -89,11 +88,11 @@ var openDBF = async (path: string): Promise<DBFFile> => {
     try {
 
         // Open the file and create a buffer to read through.
-        var fd = await (fs.openAsync(path, 'r'));
+        var fd = await fs.open(path, 'r');
         var buffer = new Buffer(32);
 
         // Read various properties from the header record.
-        await (fs.readAsync(fd, buffer, 0, 32, 0));
+        await fs.read(fd, buffer, 0, 32, 0);
         var fileVersion = buffer.readInt8(0);
         var recordCount = buffer.readInt32LE(4);
         var headerLength = buffer.readInt16LE(8);
@@ -105,7 +104,7 @@ var openDBF = async (path: string): Promise<DBFFile> => {
         // Parse all field descriptors.
         var fields: Field[] = [];
         while (headerLength > 32 + fields.length * 32) {
-            await (fs.readAsync(fd, buffer, 0, 32, 32 + fields.length * 32));
+            await fs.read(fd, buffer, 0, 32, 32 + fields.length * 32);
             if (buffer.readUInt8(0) === 0x0D) break;
             var field = {
                 name: buffer.toString('utf8', 0, 10).split('\0')[0],
@@ -118,7 +117,7 @@ var openDBF = async (path: string): Promise<DBFFile> => {
         }
 
         // Parse the header terminator.
-        await (fs.readAsync(fd, buffer, 0, 1, 32 + fields.length * 32));
+        await fs.read(fd, buffer, 0, 1, 32 + fields.length * 32);
         assert(buffer[0] === 0x0d, 'Invalid DBF: Expected header terminator');
 
         // Validate the record length.
@@ -138,7 +137,7 @@ var openDBF = async (path: string): Promise<DBFFile> => {
     finally {
 
         // Close the file.
-        if (fd) await (fs.closeAsync(fd));
+        if (fd) await fs.close(fd);
     }
 };
 
@@ -153,7 +152,7 @@ var createDBF = async (path: string, fields: Field[]): Promise<DBFFile> => {
         validateFields(fields);
 
         // Create the file and create a buffer to write through.
-        var fd = await (fs.openAsync(path, 'wx'));
+        var fd = await fs.open(path, 'wx');
         var buffer = new Buffer(32);
 
         // Write the header structure up to the field descriptors.
@@ -172,7 +171,7 @@ var createDBF = async (path: string, fields: Field[]): Promise<DBFFile> => {
         buffer.writeUInt32LE(0, 0x14);                          // Reserved/unused (set to zero)
         buffer.writeUInt32LE(0, 0x18);                          // Reserved/unused (set to zero)
         buffer.writeUInt32LE(0, 0x1C);                          // Reserved/unused (set to zero)
-        await (fs.writeAsync(fd, buffer, 0, 32, 0));
+        await fs.write(fd, buffer, 0, 32, 0);
 
         // Write the field descriptors.
         for (var i = 0; i < fields.length; ++i) {
@@ -192,14 +191,14 @@ var createDBF = async (path: string, fields: Field[]): Promise<DBFFile> => {
             buffer.writeUInt32LE(0, 0x18);                      // Reserved (set to zero)
             buffer.writeUInt32LE(0, 0x1C);                      // Reserved (set to zero)
             buffer.writeUInt8(0, 0x1F);                         // Index field flag (set to zero)
-            await (fs.writeAsync(fd, buffer, 0, 32, 32 + i * 32));
+            await fs.write(fd, buffer, 0, 32, 32 + i * 32);
         }
 
         // Write the header terminator and EOF marker.
         buffer.writeUInt8(0x0D, 0);                             // Header terminator
         buffer.writeUInt8(0x00, 1);                             // Null byte (unnecessary but common, accounted for in header length)
         buffer.writeUInt8(0x1A, 2);                             // EOF marker
-        await (fs.writeAsync(fd, buffer, 0, 3, 32 + fields.length * 32));
+        await fs.write(fd, buffer, 0, 3, 32 + fields.length * 32);
 
         // Return a new DBFFile instance.
         var result = new DBFFile();
@@ -214,7 +213,7 @@ var createDBF = async (path: string, fields: Field[]): Promise<DBFFile> => {
     finally {
 
         // Close the file.
-        if (fd) await (fs.closeAsync(fd));
+        if (fd) await fs.close(fd);
     }
 };
 
@@ -226,7 +225,7 @@ var appendToDBF = async (dbf: DBFFile, records: any[]): Promise<DBFFile> => {
     try {
 
         // Open the file and create a buffer to read and write through.
-        var fd = await (fs.openAsync(dbf.path, 'r+'));
+        var fd = await fs.open(dbf.path, 'r+');
         var recordLength = calcRecordLength(dbf.fields);
         var buffer = new Buffer(recordLength + 4);
 
@@ -297,18 +296,18 @@ var appendToDBF = async (dbf: DBFFile, records: any[]): Promise<DBFFile> => {
                         throw new Error("Type '" + field.type + "' is not supported");
                 }
             }
-            await (fs.writeAsync(fd, buffer, 0, recordLength, currentPosition));
+            await fs.write(fd, buffer, 0, recordLength, currentPosition);
             currentPosition += recordLength;
         }
 
         // Write a new EOF marker.
         buffer.writeUInt8(0x1A, 0);
-        await (fs.writeAsync(fd, buffer, 0, 1, currentPosition));
+        await fs.write(fd, buffer, 0, 1, currentPosition);
 
         // Update the record count in the file and in the DBFFile instance.
         dbf.recordCount += records.length;
         buffer.writeInt32LE(dbf.recordCount, 0);
-        await (fs.writeAsync(fd, buffer, 0, 4, 0x04));
+        await fs.write(fd, buffer, 0, 4, 0x04);
 
         // Return the same DBFFile instance.
         return dbf;
@@ -316,7 +315,7 @@ var appendToDBF = async (dbf: DBFFile, records: any[]): Promise<DBFFile> => {
     finally {
 
         // Close the file.
-        if (fd) await (fs.closeAsync(fd));
+        if (fd) await fs.close(fd);
     }
 };
 
@@ -328,7 +327,7 @@ var readRecordsFromDBF = async (dbf: DBFFile, maxRows: number) => {
     try {
 
         // Open the file and prepare to create a buffer to read through.
-        var fd = await (fs.openAsync(dbf.path, 'r'));
+        var fd = await fs.open(dbf.path, 'r');
         var rowsInBuffer = 1000;
         var recordLength = dbf._recordLength;
         var buffer = new Buffer(recordLength * rowsInBuffer);
@@ -353,7 +352,7 @@ var readRecordsFromDBF = async (dbf: DBFFile, maxRows: number) => {
             if (rowsToRead === 0) break;
 
             // Read the chunk of rows into the buffer.
-            await (fs.readAsync(fd, buffer, 0, recordLength * rowsToRead, currentPosition));
+            await fs.read(fd, buffer, 0, recordLength * rowsToRead, currentPosition);
             dbf._recordsRead += rowsToRead;
             currentPosition += recordLength * rowsToRead;
 
@@ -415,7 +414,7 @@ var readRecordsFromDBF = async (dbf: DBFFile, maxRows: number) => {
     finally {
 
         // Close the file.
-        if (fd) await (fs.closeAsync(fd));
+        if (fd) await fs.close(fd);
     }
 };
 
