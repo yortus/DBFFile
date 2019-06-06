@@ -1,4 +1,4 @@
-built/
+dist/
 node_modules/
 *.js.map
 *.log

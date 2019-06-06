@@ -2,11 +2,11 @@
   "name": "dbffile",
   "version": "0.7.6",
   "description": "",
-  "main": "built/dbf-file.js",
-  "typings": "built/dbf-file.d.ts",
+  "main": "dist/dbf-file.js",
+  "typings": "dist/dbf-file.d.ts",
   "scripts": {
-    "build": "tsc -p src && tsc -p test && ncp test/fixtures built/test/fixtures",
-    "clean": "rimraf built/",
+    "build": "tsc -p src && tsc -p test && ncp test/fixtures dist/test/fixtures",
+    "clean": "rimraf dist/",
     "prepublish": "npm run self-ref && npm run build",
     "test": "node ./scripts/run-tests",
     "self-ref": "node ./scripts/enable-self-reference"

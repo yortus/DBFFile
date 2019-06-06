@@ -1,5 +1,5 @@
 .vscode/
-built/test/
+dist/test/
 scripts/
 src/
 test/
