@@ -1,6 +1,5 @@
 'use strict';
 import * as path from 'path';
-import * as _ from 'lodash';
 import {expect} from 'chai';
 import * as DBFFile from 'dbffile';
 
@@ -35,10 +34,10 @@ describe('Reading a DBF file', () => {
             let actualDels = null;
             let actualError = null;
             try {
-                let dbf = await (DBFFile.open(filepath));
-                let rows = await (dbf.readRecords(500));
+                let dbf = await DBFFile.open(filepath);
+                let rows = await dbf.readRecords(500);
                 actualRows = dbf.recordCount;
-                actualData = _.pick(rows[0], _.keys(expectedData));
+                actualData = rows[0];
                 actualDels = dbf.recordCount - rows.length;
             }
             catch (ex) {
@@ -49,7 +48,7 @@ describe('Reading a DBF file', () => {
             }
             else {
                 expect(actualRows).equals(expectedRows);
-                expect(actualData).deep.equal(expectedData);
+                expect(actualData).to.deep.include(expectedData);
                 expect(actualDels).equals(expectedDels);
             }
         });

@@ -31,9 +31,7 @@
   },
   "homepage": "https://github.com/paypac/DBFFile",
   "dependencies": {
-    "@types/lodash": "^4.14.66",
     "@types/node": "^8.0",
-    "lodash": "^4.17.11",
     "moment": "^2.21.0"
   },
   "devDependencies": {

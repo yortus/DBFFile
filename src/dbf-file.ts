@@ -1,6 +1,5 @@
 import * as assert from 'assert';
 import * as fs from './fs';
-import * as _ from 'lodash';
 import * as moment from 'moment';
 
 
@@ -204,7 +203,7 @@ var createDBF = async (path: string, fields: Field[]): Promise<DBFFile> => {
         var result = new DBFFile();
         result.path = path;
         result.recordCount = 0;
-        result.fields = _.cloneDeep(fields);
+        result.fields = fields.map(field => ({...field})); // make new copy of field descriptors
         result._recordsRead = 0;
         result._headerLength = headerLength;
         result._recordLength = recordLength;
@@ -426,10 +425,10 @@ function validateFields(fields: Field[]): void {
     if (fields.length > 2046) throw new Error('Too many fields (maximum is 2046)');
     for (var i = 0; i < fields.length; ++i) {
         var name = fields[i].name, type = fields[i].type, size = fields[i].size, decs = fields[i].decs;
-        if (!_.isString(name)) throw new Error('Name must be a string');
-        if (!_.isString(type) || type.length !== 1) throw new Error('Type must be a single character');
-        if (!_.isNumber(size)) throw new Error('Size must be a number');
-        if (decs && !_.isNumber(decs)) throw new Error('Decs must be null, or a number');
+        if (typeof name !== 'string') throw new Error('Name must be a string');
+        if (typeof type !== 'string' || type.length !== 1) throw new Error('Type must be a single character');
+        if (typeof size !== 'number') throw new Error('Size must be a number');
+        if (decs !== null && typeof decs !== 'number') throw new Error('Decs must be null, or a number');
         if (name.length < 1) throw new Error("Field name '" + name + "' is too short (minimum is 1 char)");
         if (name.length > 10) throw new Error("Field name '" + name + "' is too long (maximum is 10 chars)");
         if (['C', 'N', 'L', 'D', 'I'].indexOf(type) === -1) throw new Error("Type '" + type + "' is not supported");
@@ -457,14 +456,14 @@ function validateRecord(fields: Field[], record: {}): void {
 
         // Perform type-specific checks
         if (type === 'C') {
-            if (!_.isString(value)) throw new Error('Expected a string');
+            if (typeof value !== 'string') throw new Error('Expected a string');
             if (value.length > 255) throw new Error('Text is too long (maximum length is 255 chars)');
         }
         else if (type === 'N') {
-            if (!_.isNumber(value)) throw new Error('Expected a number');
+            if (typeof value !== 'number') throw new Error('Expected a number');
         }
         else if (type === 'D') {
-            if (!_.isDate(value)) throw new Error('Expected a date');
+            if (!(value instanceof Date)) throw new Error('Expected a date');
         }
     }
 }
