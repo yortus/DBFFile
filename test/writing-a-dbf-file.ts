@@ -1,8 +1,9 @@
-'use strict';
 import * as path from 'path';
-import {sync as rimraf} from 'rimraf'
+import * as rimraf from 'rimraf'
 import {expect} from 'chai';
 import * as DBFFile from 'dbffile';
+
+
 
 
 describe('Writing a DBF file', () => {
@@ -25,7 +26,7 @@ describe('Writing a DBF file', () => {
         },
     ];
 
-    rimraf(path.join(__dirname, `./fixtures/*.out`));
+    rimraf.sync(path.join(__dirname, `./fixtures/*.out`));
 
     tests.forEach(test => {
         it(test.filename, async () => {

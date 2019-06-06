@@ -1,7 +1,9 @@
-'use strict';
 import * as path from 'path';
 import {expect} from 'chai';
 import * as DBFFile from 'dbffile';
+
+
+
 
 describe('Reading a DBF file', () => {
 
