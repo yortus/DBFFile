@@ -71,7 +71,7 @@ async function openDBF(path: string): Promise<DBFFile> {
     try {
         // Open the file and create a buffer to read through.
         fd = await fs.open(path, 'r');
-        let buffer = new Buffer(32);
+        let buffer = Buffer.alloc(32);
 
         // Read various properties from the header record.
         await fs.read(fd, buffer, 0, 32, 0);
@@ -133,7 +133,7 @@ async function createDBF(path: string, fields: Field[]): Promise<DBFFile> {
 
         // Create the file and create a buffer to write through.
         fd = await fs.open(path, 'wx');
-        let buffer = new Buffer(32);
+        let buffer = Buffer.alloc(32);
 
         // Write the header structure up to the field descriptors.
         buffer.writeUInt8(0x03, 0x00);                          // Version (set to dBase III)
@@ -205,7 +205,7 @@ async function appendToDBF(dbf: DBFFile, records: any[]): Promise<DBFFile> {
         // Open the file and create a buffer to read and write through.
         fd = await fs.open(dbf.path, 'r+');
         let recordLength = calcRecordLength(dbf.fields);
-        let buffer = new Buffer(recordLength + 4);
+        let buffer = Buffer.alloc(recordLength + 4);
 
         // Calculate the file position at which to start appending.
         let currentPosition = dbf._headerLength + dbf.recordCount * recordLength;
@@ -306,7 +306,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxRows: number) {
         fd = await fs.open(dbf.path, 'r');
         let rowsInBuffer = 1000;
         let recordLength = dbf._recordLength;
-        let buffer = new Buffer(recordLength * rowsInBuffer);
+        let buffer = Buffer.alloc(recordLength * rowsInBuffer);
 
         // Calculate the file position at which to start reading.
         let currentPosition = dbf._headerLength + recordLength * dbf._recordsRead;
@@ -381,7 +381,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxRows: number) {
             }
 
             // Allocate a new buffer, so that all the raw buffer slices created above arent't invalidated.
-            buffer = new Buffer(recordLength * rowsInBuffer);
+            buffer = Buffer.alloc(recordLength * rowsInBuffer);
         }
 
         // Return all the rows that were read.
