@@ -1,4 +1,5 @@
 // For information about the dBase III file format, see:
+// https://en.wikipedia.org/wiki/.dbf
 // http://www.dbf2002.com/dbf-file-format.html
 // http://www.dbase.com/KnowledgeBase/int/db7_file_fmt.htm
 
@@ -15,12 +16,12 @@ import * as fs from './fs';
 /** Represents a DBF file. */
 export class DBFFile {
 
-    /** Open an existing DBF file. */
+    /** Opens an existing DBF file. */
     static async open(path: string) {
         return openDBF(path);
     }
 
-    /** Create a new DBF file with no records. */
+    /** Creates a new DBF file with no records. */
     static async create(path: string, fields: Field[]) {
         return createDBF(path, fields);
     }
@@ -34,12 +35,12 @@ export class DBFFile {
     /** Metadata for all fields defined in the DBF file. */
     fields = [] as Field[];
 
-    /** Append the specified records to this DBF file. */
+    /** Appends the specified records to this DBF file. */
     append(records: any[]) {
         return appendToDBF(this, records);
     }
 
-    /** Read a subset of records from this DBF file. */
+    /** Reads a subset of records from this DBF file. */
     readRecords(maxRows = 10000000) {
         return readRecordsFromDBF(this, maxRows);
     }
@@ -53,7 +54,7 @@ export class DBFFile {
 
 
 
-/** Structural typing for DBF field metadata. */
+/** Metadata describing a single field in a DBF file. */
 export interface Field {
     name: string;
     type: string;
