@@ -2,8 +2,8 @@
   "name": "dbffile",
   "version": "0.7.6",
   "description": "",
-  "main": "dist/dbf-file.js",
-  "typings": "dist/dbf-file.d.ts",
+  "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p src && tsc -p test && ncp test/fixtures dist/test/fixtures",
     "clean": "rimraf dist/",

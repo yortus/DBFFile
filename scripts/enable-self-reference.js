@@ -1,7 +1,16 @@
-var fs = require('fs');
-var path = require('path');
+let fs = require('fs');
+let path = require('path');
 
 
-// Add dbffile.js and dbffile.d.ts to dbffile's own node_modules folder, so it can require() itself (e.g. in tests).
-fs.writeFileSync(path.join(__dirname, '../node_modules/dbffile.js'), `module.exports = require('..');`);
-fs.writeFileSync(path.join(__dirname, '../node_modules/dbffile.d.ts'), `export * from '..';`);
+
+
+// Create a symlink at `node_modules/penc` pointing to `dist/commonjs`
+try {
+    let linkFrom = path.join(__dirname, '../node_modules/dbffile');
+    let linkTo = path.join(__dirname, '../dist');
+    fs.symlinkSync(linkTo, linkFrom, 'junction');
+}
+catch (err) {
+    // An EEXIST error implies we already have a self-ref, in which case we ignore and continue. 
+    if (err.code !== 'EEXIST') throw err;
+}

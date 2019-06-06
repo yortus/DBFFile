@@ -1,7 +1,7 @@
 import * as path from 'path';
 import * as rimraf from 'rimraf'
 import {expect} from 'chai';
-import * as DBFFile from 'dbffile';
+import {DBFFile} from 'dbffile';
 
 
 

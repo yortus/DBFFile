@@ -12,24 +12,18 @@ import * as fs from './fs';
 
 
 
-/** Open an existing DBF file. */
-export async function open(path: string) {
-    return openDBF(path);
-}
-
-
-
-
-/** Create a new DBF file with no records. */
-export async function create(path: string, fields: Field[]) {
-    return createDBF(path, fields);
-}
-
-
-
-
 /** Represents a DBF file. */
 export class DBFFile {
+
+    /** Open an existing DBF file. */
+    static async open(path: string) {
+        return openDBF(path);
+    }
+
+    /** Create a new DBF file with no records. */
+    static async create(path: string, fields: Field[]) {
+        return createDBF(path, fields);
+    }
 
     /** Full path to the DBF file. */
     path = '';

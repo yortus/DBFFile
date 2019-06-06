@@ -23,7 +23,7 @@ Read and write .dbf (dBase III) files in Node.js:
 ### Example: reading a .dbf file
 
 ```javascript
-var DBFFile = require('dbffile');
+import {DBFFile} from 'dbffile';
 
 DBFFile.open('[full path to .dbf file]')
     .then(dbf => {
@@ -38,14 +38,14 @@ DBFFile.open('[full path to .dbf file]')
 ### Example: writing a .dbf file
 
 ```javascript
-var DBFFile = require('dbffile');
+import {DBFFile} from 'dbffile';
 
-var fieldDescriptors = [
+let fieldDescriptors = [
     { name: 'fname', type: 'C', size: 255 },
     { name: 'lname', type: 'C', size: 255 }
 ];
 
-var rows = [
+let rows = [
     { fname: 'Joe', lname: 'Bloggs' },
     { fname: 'Mary', lname: 'Smith' }
 ];
