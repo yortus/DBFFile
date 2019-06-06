@@ -9,7 +9,7 @@ describe('Reading a DBF file', () => {
         {
             filename: 'PYACFL.DBF',
             rowCount: 45,
-            firstRow: { AFCLPD: 'W', AFHRPW: 2.92308, AFLVCL: 0.00, AFCRDA: new Date(1999, 2, 25), AFPSDS: '' },
+            firstRow: { AFCLPD: 'W', AFHRPW: 2.92308, AFLVCL: 0.00, AFCRDA: new Date('1999-03-25'), AFPSDS: '' },
             delCount: 30,
             error: null
         },

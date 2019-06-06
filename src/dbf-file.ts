@@ -1,6 +1,6 @@
 import * as assert from 'assert';
+import {formatDate, parseDate} from './date';
 import * as fs from './fs';
-import * as moment from 'moment';
 
 
 
@@ -281,7 +281,7 @@ var appendToDBF = async (dbf: DBFFile, records: any[]): Promise<DBFFile> => {
                         break;
 
                     case 'D': // Date
-                        value = value ? moment(value).format('YYYYMMDD') : '        ';
+                        value = value ? formatDate(value) : '        ';
                         buffer.write(value, offset, 8, 'utf8');
                         offset += 8;
                         break;
@@ -386,7 +386,7 @@ var readRecordsFromDBF = async (dbf: DBFFile, maxRows: number) => {
                             value = 'TtYy'.indexOf(c) >= 0 ? true : ('FfNn'.indexOf(c) >= 0 ? false : null);
                             break;
                         case 'D': // Date
-                            value = buffer[offset] === 0x20 ? null : moment(substr(offset, 8), "YYYYMMDD").toDate();
+                            value = buffer[offset] === 0x20 ? null : parseDate(substr(offset, 8));
                             offset += 8;
                             break;
                         case 'I': // Integer

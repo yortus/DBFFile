@@ -21,7 +21,7 @@ describe('Writing a DBF file', () => {
                 ...row,
                 NO: i
             }),
-            firstRow: { AFCLPD: 'W', AFHRPW: 2.92308, AFLVCL: 0.00, AFCRDA: new Date(1999, 2, 25), AFPSDS: '', NO: 0 },
+            firstRow: { AFCLPD: 'W', AFHRPW: 2.92308, AFLVCL: 0.00, AFCRDA: new Date('1999-03-25'), AFPSDS: '', NO: 0 },
         },
     ];
 
