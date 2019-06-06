@@ -13,7 +13,7 @@ import * as fs from './fs';
 
 
 /** Open an existing DBF file. */
-export function open(path: string) {
+export async function open(path: string) {
     return openDBF(path);
 }
 
@@ -21,7 +21,7 @@ export function open(path: string) {
 
 
 /** Create a new DBF file with no records. */
-export function create(path: string, fields: Field[]) {
+export async function create(path: string, fields: Field[]) {
     return createDBF(path, fields);
 }
 
@@ -32,13 +32,13 @@ export function create(path: string, fields: Field[]) {
 export class DBFFile {
 
     /** Full path to the DBF file. */
-    path: string = null;
+    path = '';
 
     /** Total number of records in the DBF file. */
-    recordCount: number = null;
+    recordCount = 0;
 
     /** Metadata for all fields defined in the DBF file. */
-    fields: Field[] = null;
+    fields = [] as Field[];
 
     /** Append the specified records to this DBF file. */
     append(records: any[]) {
@@ -51,9 +51,9 @@ export class DBFFile {
     }
 
     // Private.
-    _recordsRead: number;
-    _headerLength: number;
-    _recordLength: number;
+    _recordsRead = 0;
+    _headerLength = 0;
+    _recordLength = 0;
 }
 
 
@@ -72,7 +72,7 @@ export interface Field {
 
 //-------------------- Private implementation starts here --------------------
 async function openDBF(path: string): Promise<DBFFile> {
-    let fd: number;
+    let fd = 0;
     try {
         // Open the file and create a buffer to read through.
         fd = await fs.open(path, 'r');
@@ -131,7 +131,7 @@ async function openDBF(path: string): Promise<DBFFile> {
 
 
 async function createDBF(path: string, fields: Field[]): Promise<DBFFile> {
-    let fd: number;
+    let fd = 0;
     try {
         // Validate the field metadata.
         validateFields(fields);
@@ -205,7 +205,7 @@ async function createDBF(path: string, fields: Field[]): Promise<DBFFile> {
 
 
 async function appendToDBF(dbf: DBFFile, records: any[]): Promise<DBFFile> {
-    let fd: number;
+    let fd = 0;
     try {
         // Open the file and create a buffer to read and write through.
         fd = await fs.open(dbf.path, 'r+');
@@ -305,7 +305,7 @@ async function appendToDBF(dbf: DBFFile, records: any[]): Promise<DBFFile> {
 
 
 async function readRecordsFromDBF(dbf: DBFFile, maxRows: number) {
-    let fd: number;
+    let fd = 0;
     try {
         // Open the file and prepare to create a buffer to read through.
         fd = await fs.open(dbf.path, 'r');
@@ -317,7 +317,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxRows: number) {
         let currentPosition = dbf._headerLength + recordLength * dbf._recordsRead;
 
         // Create a convenience function for extracting strings from the buffer.
-        let substr = (start, count) => buffer.toString('utf8', start, start + count);
+        let substr = (start: number, count: number) => buffer.toString('utf8', start, start + count);
 
         // Read rows in chunks, until enough rows have been read.
         let rows = [];
@@ -339,7 +339,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxRows: number) {
 
             // Parse each row.
             for (let i = 0, offset = 0; i < rowsToRead; ++i) {
-                let row = { _raw: {} };
+                let row = {_raw: {}} as Record<string, unknown> & { _raw: Record<string, unknown> };
                 let isDeleted = (buffer[offset++] === 0x2a);
                 if (isDeleted) { offset += recordLength - 1; continue; }
 
@@ -425,7 +425,7 @@ function validateFields(fields: Field[]): void {
 
 
 
-function validateRecord(fields: Field[], record: {}): void {
+function validateRecord(fields: Field[], record: Record<string, unknown>): void {
     for (let i = 0; i < fields.length; ++i) {
         let name = fields[i].name, type = fields[i].type;
         let value = record[name];

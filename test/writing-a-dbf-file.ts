@@ -18,10 +18,7 @@ describe('Writing a DBF file', () => {
                 size: 4,
                 decs: 0
             }],
-            addValues: (row, i) => ({
-                ...row,
-                NO: i
-            }),
+            addValues: (row: Record<string, unknown>, i: number) => ({...row, NO: i}),
             firstRow: { AFCLPD: 'W', AFHRPW: 2.92308, AFLVCL: 0.00, AFCRDA: new Date('1999-03-25'), AFPSDS: '', NO: 0 },
         },
     ];

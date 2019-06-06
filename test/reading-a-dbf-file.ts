@@ -28,13 +28,13 @@ describe('Reading a DBF file', () => {
         it(test.filename, async () => {
             let filepath = path.join(__dirname, `./fixtures/${test.filename}`);
             let expectedRows = test.rowCount;
-            let expectedData = test.firstRow;
+            let expectedData: Record<string, unknown> | null = test.firstRow;
             let expectedDels = test.delCount;
             let expectedError = test.error;
-            let actualRows = null;
-            let actualData = null;
-            let actualDels = null;
-            let actualError = null;
+            let actualRows: typeof expectedRows = null;
+            let actualData: typeof expectedData = null;
+            let actualDels: typeof expectedDels = null;
+            let actualError: typeof expectedError = null;
             try {
                 let dbf = await DBFFile.open(filepath);
                 let rows = await dbf.readRecords(500);
@@ -50,7 +50,7 @@ describe('Reading a DBF file', () => {
             }
             else {
                 expect(actualRows).equals(expectedRows);
-                expect(actualData).to.deep.include(expectedData);
+                expect(actualData).to.deep.include(expectedData!);
                 expect(actualDels).equals(expectedDels);
             }
         });
