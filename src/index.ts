@@ -1,1 +1,1 @@
-export {DBFFile, DBFFile as default} from './dbf-file';
+export {DBFFile, DBFFile as default, FieldDescriptor} from './dbf-file';

@@ -8,7 +8,7 @@
     "build": "tsc -p src && tsc -p test && ncp test/fixtures dist/test/fixtures",
     "clean": "rimraf dist/",
     "prepublish": "npm run self-ref && npm run build",
-    "test": "node ./scripts/run-tests",
+    "test": "mocha --timeout 999999 --colors ./dist/test",
     "self-ref": "node ./scripts/enable-self-reference"
   },
   "repository": {

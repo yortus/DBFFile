@@ -1,5 +1,5 @@
 import {expect} from 'chai';
-import {DBFFile} from 'dbffile';
+import {DBFFile, FieldDescriptor} from 'dbffile';
 import * as path from 'path';
 import * as rimraf from 'rimraf'
 
@@ -16,8 +16,7 @@ describe('Writing a DBF file', () => {
                 name: 'NO',
                 type: 'I',
                 size: 4,
-                decs: 0
-            }],
+            }] as FieldDescriptor[],
             newRecord: (record: Record<string, unknown>, i: number) => ({...record, NO: i}),
             firstRecord: { AFCLPD: 'W', AFHRPW: 2.92308, AFLVCL: 0.00, AFCRDA: new Date('1999-03-25'), AFPSDS: '', NO: 0 },
         },

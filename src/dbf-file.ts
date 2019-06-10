@@ -22,7 +22,7 @@ export class DBFFile {
     }
 
     /** Creates a new DBF file with no records. */
-    static async create(path: string, fields: Field[]) {
+    static async create(path: string, fields: FieldDescriptor[]) {
         return createDBF(path, fields);
     }
 
@@ -33,7 +33,7 @@ export class DBFFile {
     recordCount = 0;
 
     /** Metadata for all fields defined in the DBF file. */
-    fields = [] as Field[];
+    fields = [] as FieldDescriptor[];
 
     /** Appends the specified records to this DBF file. */
     appendRecords(records: any[]) {
@@ -55,11 +55,19 @@ export class DBFFile {
 
 
 /** Metadata describing a single field in a DBF file. */
-export interface Field {
+export interface FieldDescriptor {
+
+    /** The name of the field. */
     name: string;
-    type: string;
+
+    /** The single-letter code for the field type. C=string, N=numeric, I=integer, L=logical, D=date. */
+    type: 'C' | 'N' | 'I' | 'L' | 'D';
+
+    /** The size of the field in bytes. */
     size: number;
-    decs: number;
+
+    /** The number of decimal places. */
+    decs?: number;
 }
 
 
@@ -84,13 +92,13 @@ async function openDBF(path: string): Promise<DBFFile> {
         assert(fileVersion === 0x03, `File '${path}' has unknown/unsupported dBase version: ${fileVersion}.`);
 
         // Parse all field descriptors.
-        let fields: Field[] = [];
+        let fields: FieldDescriptor[] = [];
         while (headerLength > 32 + fields.length * 32) {
             await fs.read(fd, buffer, 0, 32, 32 + fields.length * 32);
             if (buffer.readUInt8(0) === 0x0D) break;
-            let field = {
+            let field: FieldDescriptor = {
                 name: buffer.toString('utf8', 0, 10).split('\0')[0],
-                type: String.fromCharCode(buffer[0x0B]),
+                type: String.fromCharCode(buffer[0x0B]) as FieldDescriptor['type'],
                 size: buffer.readUInt8(0x10),
                 decs: buffer.readUInt8(0x11)
             };
@@ -125,7 +133,7 @@ async function openDBF(path: string): Promise<DBFFile> {
 
 
 
-async function createDBF(path: string, fields: Field[]): Promise<DBFFile> {
+async function createDBF(path: string, fields: FieldDescriptor[]): Promise<DBFFile> {
     let fd = 0;
     try {
         // Validate the field metadata.
@@ -396,23 +404,31 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
 
 
 
-function validateFields(fields: Field[]): void {
+function validateFields(fields: FieldDescriptor[]): void {
     if (fields.length > 2046) throw new Error('Too many fields (maximum is 2046)');
     for (let i = 0; i < fields.length; ++i) {
         let name = fields[i].name, type = fields[i].type, size = fields[i].size, decs = fields[i].decs;
+
+        // name
         if (typeof name !== 'string') throw new Error('Name must be a string');
-        if (typeof type !== 'string' || type.length !== 1) throw new Error('Type must be a single character');
-        if (typeof size !== 'number') throw new Error('Size must be a number');
-        if (decs !== null && typeof decs !== 'number') throw new Error('Decs must be null, or a number');
         if (name.length < 1) throw new Error(`Field name '${name}' is too short (minimum is 1 char)`);
         if (name.length > 10) throw new Error(`Field name '${name}' is too long (maximum is 10 chars)`);
+
+        // type
+        if (typeof type !== 'string' || type.length !== 1) throw new Error('Type must be a single character');
         if (['C', 'N', 'L', 'D', 'I'].indexOf(type) === -1) throw new Error(`Type '${type}' is not supported`);
+
+        // size
+        if (typeof size !== 'number') throw new Error('Size must be a number');
         if (size < 1) throw new Error('Field size is too small (minimum is 1)');
         if (type === 'C' && size > 255) throw new Error('Field size is too large (maximum is 255)');
         if (type === 'N' && size > 20) throw new Error('Field size is too large (maximum is 20)');
         if (type === 'L' && size !== 1) throw new Error('Invalid field size (must be 1)');
         if (type === 'D' && size !== 8) throw new Error('Invalid field size (must be 8)');
         if (type === 'I' && size !== 4) throw new Error('Invalid field size (must be 4)');
+
+        // decs
+        if (decs !== undefined && typeof decs !== 'number') throw new Error('Decs must be undefined or a number');
         if (decs && decs > 15) throw new Error('Decimal count is too large (maximum is 15)');
     }
 }
@@ -420,7 +436,7 @@ function validateFields(fields: Field[]): void {
 
 
 
-function validateRecord(fields: Field[], record: Record<string, unknown>): void {
+function validateRecord(fields: FieldDescriptor[], record: Record<string, unknown>): void {
     for (let i = 0; i < fields.length; ++i) {
         let name = fields[i].name, type = fields[i].type;
         let value = record[name];
@@ -445,7 +461,7 @@ function validateRecord(fields: Field[], record: Record<string, unknown>): void 
 
 
 
-function calculateRecordLengthInBytes(fields: Field[]): number {
+function calculateRecordLengthInBytes(fields: FieldDescriptor[]): number {
     let len = 1; // 'Record deleted flag' adds one byte
     for (let i = 0; i < fields.length; ++i) len += fields[i].size;
     return len;
