@@ -11,15 +11,15 @@ describe('Writing a DBF file', () => {
     let tests = [
         {
             filename: 'PYACFL.DBF',
-            rowCount: 15,
-            addFields: [{
+            recordCount: 15,
+            newFields: [{
                 name: 'NO',
                 type: 'I',
                 size: 4,
                 decs: 0
             }],
-            addValues: (row: Record<string, unknown>, i: number) => ({...row, NO: i}),
-            firstRow: { AFCLPD: 'W', AFHRPW: 2.92308, AFLVCL: 0.00, AFCRDA: new Date('1999-03-25'), AFPSDS: '', NO: 0 },
+            newRecord: (record: Record<string, unknown>, i: number) => ({...record, NO: i}),
+            firstRecord: { AFCLPD: 'W', AFHRPW: 2.92308, AFLVCL: 0.00, AFCRDA: new Date('1999-03-25'), AFPSDS: '', NO: 0 },
         },
     ];
 
@@ -31,16 +31,16 @@ describe('Writing a DBF file', () => {
             let dstPath = path.join(__dirname, `./fixtures/${test.filename}.out`);
 
             let srcDbf = await DBFFile.open(srcPath);
-            let dstDbf = await DBFFile.create(dstPath, srcDbf.fields.concat(test.addFields));
+            let dstDbf = await DBFFile.create(dstPath, srcDbf.fields.concat(test.newFields));
 
-            let rows = await srcDbf.readRecords(100);
-            await dstDbf.append(rows.map(test.addValues));
+            let records = await srcDbf.readRecords(100);
+            await dstDbf.append(records.map(test.newRecord));
 
             dstDbf = await DBFFile.open(dstPath);
-            rows = await dstDbf.readRecords(500);
-            let firstRow = rows[0];
-            expect(dstDbf.recordCount).equal(test.rowCount);
-            expect(firstRow).to.deep.include(test.firstRow);
+            records = await dstDbf.readRecords(500);
+            let firstRecord = records[0];
+            expect(dstDbf.recordCount).equal(test.recordCount);
+            expect(firstRecord).to.deep.include(test.firstRecord);
         });
     });
 });

@@ -27,10 +27,10 @@ import {DBFFile} from 'dbffile';
 
 async function testRead() {
     let dbf = await DBFFile.open('<full path to .dbf file>');
-    console.log(`DBF file contains ${dbf.recordCount} rows.`);
+    console.log(`DBF file contains ${dbf.recordCount} records.`);
     console.log(`Field names: ${dbf.fields.map(f => f.name).join(', ')}`);
-    let rows = await dbf.readRecords(100);
-    for (let row of rows) console.log(row);
+    let records = await dbf.readRecords(100);
+    for (let record of records) console.log(records);
 }
 ```
 
@@ -45,15 +45,15 @@ async function testWrite() {
         { name: 'lname', type: 'C', size: 255 }
     ];
 
-    let rows = [
+    let records = [
         { fname: 'Joe', lname: 'Bloggs' },
         { fname: 'Mary', lname: 'Smith' }
     ];
 
     let dbf = await DBFFile.create('<full path to .dbf file>', fieldDescriptors);
     console.log('DBF file created.');
-    await dbf.append(rows);
-    console.log(`${rows.length} rows added.`);
+    await dbf.append(records);
+    console.log(`${records.length} records added.`);
 }
 ```
 
@@ -65,10 +65,10 @@ The module exports the `DBFFile` class, which has the following shape:
 /** Represents a DBF file. */
 class DBFFile {
 
-    /** Open an existing DBF file. */
+    /** Opens an existing DBF file. */
     static open(path: string): Promise<DBFFile>;
 
-    /** Create a new DBF file with no records. */
+    /** Creates a new DBF file with no records. */
     static create(path: string, fields: Field[]): Promise<DBFFile>;
 
     /** Full path to the DBF file. */
@@ -85,10 +85,10 @@ class DBFFile {
         decs: number;
     }>;
 
-    /** Append the specified records to this DBF file. */
+    /** Appends the specified records to this DBF file. */
     append(records: object[]): Promise<DBFFile>;
 
-    /** read some specific rows from the dbf file. **/
-    readRecords(maxRows?: number): Promise<object[]>;
+    /** Reads a subset of records from this DBF file. */
+    readRecords(maxCount?: number): Promise<object[]>;
 }
 ```

@@ -29,7 +29,7 @@ export class DBFFile {
     /** Full path to the DBF file. */
     path = '';
 
-    /** Total number of records in the DBF file. */
+    /** Total number of records in the DBF file. (NB: includes deleted records). */
     recordCount = 0;
 
     /** Metadata for all fields defined in the DBF file. */
@@ -41,8 +41,8 @@ export class DBFFile {
     }
 
     /** Reads a subset of records from this DBF file. */
-    readRecords(maxRows = 10000000) {
-        return readRecordsFromDBF(this, maxRows);
+    readRecords(maxCount = 10000000) {
+        return readRecordsFromDBF(this, maxCount);
     }
 
     // Private.
@@ -299,14 +299,14 @@ async function appendToDBF(dbf: DBFFile, records: any[]): Promise<DBFFile> {
 
 
 
-async function readRecordsFromDBF(dbf: DBFFile, maxRows: number) {
+async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
     let fd = 0;
     try {
         // Open the file and prepare to create a buffer to read through.
         fd = await fs.open(dbf.path, 'r');
-        let rowsInBuffer = 1000;
+        let recordCountPerBuffer = 1000;
         let recordLength = dbf._recordLength;
-        let buffer = Buffer.alloc(recordLength * rowsInBuffer);
+        let buffer = Buffer.alloc(recordLength * recordCountPerBuffer);
 
         // Calculate the file position at which to start reading.
         let currentPosition = dbf._headerLength + recordLength * dbf._recordsRead;
@@ -314,27 +314,27 @@ async function readRecordsFromDBF(dbf: DBFFile, maxRows: number) {
         // Create a convenience function for extracting strings from the buffer.
         let substr = (start: number, count: number) => buffer.toString('utf8', start, start + count);
 
-        // Read rows in chunks, until enough rows have been read.
-        let rows = [];
+        // Read records in chunks, until enough records have been read.
+        let records = [];
         while (true) {
 
-            // Work out how many rows to read in this chunk.
-            let maxRows1 = dbf.recordCount - dbf._recordsRead;
-            let maxRows2 = maxRows - rows.length;
-            let rowsToRead = maxRows1 < maxRows2 ? maxRows1 : maxRows2;
-            if (rowsToRead > rowsInBuffer) rowsToRead = rowsInBuffer;
+            // Work out how many records to read in this chunk.
+            let maxRecords1 = dbf.recordCount - dbf._recordsRead;
+            let maxRecords2 = maxCount - records.length;
+            let recordCountToRead = maxRecords1 < maxRecords2 ? maxRecords1 : maxRecords2;
+            if (recordCountToRead > recordCountPerBuffer) recordCountToRead = recordCountPerBuffer;
 
-            // Quit when no more rows to read.
-            if (rowsToRead === 0) break;
+            // Quit when there are no more records to read.
+            if (recordCountToRead === 0) break;
 
-            // Read the chunk of rows into the buffer.
-            await fs.read(fd, buffer, 0, recordLength * rowsToRead, currentPosition);
-            dbf._recordsRead += rowsToRead;
-            currentPosition += recordLength * rowsToRead;
+            // Read the chunk of records into the buffer.
+            await fs.read(fd, buffer, 0, recordLength * recordCountToRead, currentPosition);
+            dbf._recordsRead += recordCountToRead;
+            currentPosition += recordLength * recordCountToRead;
 
-            // Parse each row.
-            for (let i = 0, offset = 0; i < rowsToRead; ++i) {
-                let row = {_raw: {}} as Record<string, unknown> & { _raw: Record<string, unknown> };
+            // Parse each record.
+            for (let i = 0, offset = 0; i < recordCountToRead; ++i) {
+                let record = {_raw: {}} as Record<string, unknown> & { _raw: Record<string, unknown> };
                 let isDeleted = (buffer[offset++] === 0x2a);
                 if (isDeleted) { offset += recordLength - 1; continue; }
 
@@ -344,7 +344,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxRows: number) {
                     let len = field.size, value: any = null;
 
                     // Keep raw buffer data for each field value.
-                    row._raw[field.name] = buffer.slice(offset, offset + field.size);
+                    record._raw[field.name] = buffer.slice(offset, offset + field.size);
 
                     // Decode the field from the buffer, according to its type.
                     switch (field.type) {
@@ -373,19 +373,19 @@ async function readRecordsFromDBF(dbf: DBFFile, maxRows: number) {
                         default:
                             throw new Error(`Type '${field.type}' is not supported`);
                     }
-                    row[field.name] = value;
+                    record[field.name] = value;
                 }
 
-                //add the row to the result.
-                rows.push(row);
+                //add the record to the result.
+                records.push(record);
             }
 
-            // Allocate a new buffer, so that all the raw buffer slices created above arent't invalidated.
-            buffer = Buffer.alloc(recordLength * rowsInBuffer);
+            // Allocate a new buffer, so that all the raw buffer slices created above are not overwritten.
+            buffer = Buffer.alloc(recordLength * recordCountPerBuffer);
         }
 
-        // Return all the rows that were read.
-        return rows;
+        // Return all the records that were read.
+        return records;
     }
     finally {
         // Close the file.
