@@ -34,7 +34,7 @@ describe('Writing a DBF file', () => {
             let dstDbf = await DBFFile.create(dstPath, srcDbf.fields.concat(test.newFields));
 
             let records = await srcDbf.readRecords(100);
-            await dstDbf.append(records.map(test.newRecord));
+            await dstDbf.appendRecords(records.map(test.newRecord));
 
             dstDbf = await DBFFile.open(dstPath);
             records = await dstDbf.readRecords(500);

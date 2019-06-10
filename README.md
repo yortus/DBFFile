@@ -52,7 +52,7 @@ async function testWrite() {
 
     let dbf = await DBFFile.create('<full path to .dbf file>', fieldDescriptors);
     console.log('DBF file created.');
-    await dbf.append(records);
+    await dbf.appendRecords(records);
     console.log(`${records.length} records added.`);
 }
 ```
@@ -86,7 +86,7 @@ class DBFFile {
     }>;
 
     /** Appends the specified records to this DBF file. */
-    append(records: object[]): Promise<DBFFile>;
+    appendRecords(records: object[]): Promise<DBFFile>;
 
     /** Reads a subset of records from this DBF file. */
     readRecords(maxCount?: number): Promise<object[]>;

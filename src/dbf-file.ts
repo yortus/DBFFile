@@ -36,7 +36,7 @@ export class DBFFile {
     fields = [] as Field[];
 
     /** Appends the specified records to this DBF file. */
-    append(records: any[]) {
+    appendRecords(records: any[]) {
         return appendToDBF(this, records);
     }
 
