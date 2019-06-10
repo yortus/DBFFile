@@ -37,7 +37,7 @@ export class DBFFile {
 
     /** Appends the specified records to this DBF file. */
     appendRecords(records: any[]) {
-        return appendToDBF(this, records);
+        return appendRecordsToDBF(this, records);
     }
 
     /** Reads a subset of records from this DBF file. */
@@ -103,7 +103,7 @@ async function openDBF(path: string): Promise<DBFFile> {
         assert(buffer[0] === 0x0d, 'Invalid DBF: Expected header terminator');
 
         // Validate the record length.
-        assert(recordLength === calcRecordLength(fields), 'Invalid DBF: Incorrect record length');
+        assert(recordLength === calculateRecordLengthInBytes(fields), 'Invalid DBF: Incorrect record length');
 
 
         // Return a new DBFFile instance.
@@ -144,7 +144,7 @@ async function createDBF(path: string, fields: Field[]): Promise<DBFFile> {
         buffer.writeInt32LE(0, 0x04);                           // Number of records (set to zero)
         let headerLength = 34 + (fields.length * 32);
         buffer.writeUInt16LE(headerLength, 0x08);               // Length of header structure
-        let recordLength = calcRecordLength(fields)
+        let recordLength = calculateRecordLengthInBytes(fields);
         buffer.writeUInt16LE(recordLength, 0x0A);               // Length of each record
         buffer.writeUInt32LE(0, 0x0C);                          // Reserved/unused (set to zero)
         buffer.writeUInt32LE(0, 0x10);                          // Reserved/unused (set to zero)
@@ -199,12 +199,12 @@ async function createDBF(path: string, fields: Field[]): Promise<DBFFile> {
 
 
 
-async function appendToDBF(dbf: DBFFile, records: any[]): Promise<DBFFile> {
+async function appendRecordsToDBF(dbf: DBFFile, records: any[]): Promise<DBFFile> {
     let fd = 0;
     try {
         // Open the file and create a buffer to read and write through.
         fd = await fs.open(dbf.path, 'r+');
-        let recordLength = calcRecordLength(dbf.fields);
+        let recordLength = calculateRecordLengthInBytes(dbf.fields);
         let buffer = Buffer.alloc(recordLength + 4);
 
         // Calculate the file position at which to start appending.
@@ -445,7 +445,7 @@ function validateRecord(fields: Field[], record: Record<string, unknown>): void 
 
 
 
-function calcRecordLength(fields: Field[]): number {
+function calculateRecordLengthInBytes(fields: Field[]): number {
     let len = 1; // 'Record deleted flag' adds one byte
     for (let i = 0; i < fields.length; ++i) len += fields[i].size;
     return len;

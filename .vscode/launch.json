@@ -3,39 +3,17 @@
 	// List of configurations. Add new configurations or edit existing ones.
 	"configurations": [
 		{
-			// Name of configuration; appears in the launch configuration drop down menu.
-			"name": "Launch tests",
-			// Type of configuration.
 			"type": "node",
-			// Workspace relative or absolute path to the program.
-			"program": "${workspaceRoot}/scripts/run-tests.js",
-			// Automatically stop program after launch.
-			"stopOnEntry": false,
-			// Command line arguments passed to the program.
-			"args": [],
-			// Workspace relative or absolute path to the working directory of the program being debugged. Default is the current workspace.
-			"cwd": "${workspaceRoot}",
-			// Workspace relative or absolute path to the runtime executable to be used. Default is the runtime executable on the PATH.
-			"runtimeExecutable": null,
-			// Optional arguments passed to the runtime executable.
-			"runtimeArgs": ["--nolazy"],
-			// Environment variables passed to the program.
-			"env": {
-				"NODE_ENV": "development"
-			},
-			// Use JavaScript source maps (if they exist).
-			"sourceMaps": true,
-			// If JavaScript source maps are enabled, the generated code is expected in this directory.
-			"outDir": "${workspaceRoot}/dist"
+			"request": "launch",
+			"name": "Mocha Tests",
+			"program": "${workspaceFolder}/node_modules/mocha/bin/_mocha",
+			"args": [
+				"--timeout",
+				"999999",
+				"--colors",
+				"${workspaceFolder}/dist/test"
+			],
+			"internalConsoleOptions": "openOnSessionStart"
 		},
-		{
-			"name": "Attach",
-			"type": "node",
-			// TCP/IP address. Default is "localhost".
-			"address": "localhost",
-			// Port to attach to.
-			"port": 5858,
-			"sourceMaps": false
-		}
 	]
 }

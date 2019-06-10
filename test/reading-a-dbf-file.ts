@@ -1,6 +1,6 @@
-import * as path from 'path';
 import {expect} from 'chai';
 import {DBFFile} from 'dbffile';
+import * as path from 'path';
 
 
 
