@@ -200,7 +200,7 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
         for (let i = 0; i < records.length; ++i) {
 
             // Write one record.
-            let record = records[i] as DBFRecord;
+            let record = records[i];
             validateRecord(dbf.fields, record);
             let offset = 0;
             buffer.writeUInt8(0x20, offset++); // Record deleted flag
@@ -212,14 +212,6 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
                 let field = dbf.fields[j];
                 let value: any = record[field.name];
                 if (value === null || typeof value === 'undefined') value = '';
-
-                // Use raw data if provided in the record.
-                let raw = record._raw && record._raw[field.name];
-                if (raw && Buffer.isBuffer(raw) && raw.length === field.size) {
-                    raw.copy(buffer, offset);
-                    offset += field.size;
-                    continue;
-                }
 
                 // Encode the field in the buffer, according to its type.
                 switch (field.type) {
@@ -300,7 +292,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
         let substr = (start: number, count: number) => iconv.decode(buffer.slice(start, start + count), dbf._encoding);
 
         // Read records in chunks, until enough records have been read.
-        let records = [] as DBFRecord[];
+        let records: Array<Record<string, unknown>> = [];
         while (true) {
 
             // Work out how many records to read in this chunk.
@@ -319,8 +311,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
 
             // Parse each record.
             for (let i = 0, offset = 0; i < recordCountToRead; ++i) {
-                let raw: DBFRecord['_raw'] = {};
-                let record: DBFRecord = {_raw: raw};
+                let record: Record<string, unknown> = {};
                 let isDeleted = (buffer[offset++] === 0x2a);
                 if (isDeleted) { offset += recordLength - 1; continue; }
 
@@ -328,9 +319,6 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                 for (let j = 0; j < dbf.fields.length; ++j) {
                     let field = dbf.fields[j];
                     let len = field.size, value: any = null;
-
-                    // Keep raw buffer data for each field value.
-                    raw[field.name] = buffer.slice(offset, offset + field.size);
 
                     // Decode the field from the buffer, according to its type.
                     switch (field.type) {
@@ -371,7 +359,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
         }
 
         // Return all the records that were read.
-        return records as Array<Record<string, unknown>>;
+        return records;
     }
     finally {
         // Close the file.
@@ -444,8 +432,3 @@ function calculateRecordLengthInBytes(fields: FieldDescriptor[]): number {
     for (let i = 0; i < fields.length; ++i) len += fields[i].size;
     return len;
 }
-
-
-
-
-type DBFRecord = Record<string, unknown> & { _raw?: Record<string, Buffer> };
