@@ -240,6 +240,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             offset += field.size;
                             break;
                         case 'N': // Number
+                        case 'F': // Float - appears to be treated identically to Number
                             while (len > 0 && buffer[offset] === 0x20) ++offset, --len;
                             value = len > 0 ? parseFloat(substr(offset, len, encoding)) : null;
                             offset += len;
@@ -324,6 +325,7 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
                         break;
 
                     case 'N': // Number
+                    case 'F': // Float - appears to be treated identically to Number
                         value = value.toString();
                         value = value.slice(0, field.size);
                         while (value.length < field.size) value = ' ' + value;
@@ -398,7 +400,7 @@ function validateRecord(fields: FieldDescriptor[], record: Record<string, unknow
             if (typeof value !== 'string') throw new Error('Expected a string');
             if (value.length > 255) throw new Error('Text is too long (maximum length is 255 chars)');
         }
-        else if (type === 'N') {
+        else if (type === 'N' || type === 'F' || type === 'I') {
             if (typeof value !== 'number') throw new Error('Expected a number');
         }
         else if (type === 'D') {
