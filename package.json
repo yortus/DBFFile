@@ -1,6 +1,6 @@
 {
   "name": "dbffile",
-  "version": "0.7.6",
+  "version": "1.0.0",
   "description": "Read and write .dbf (dBase III) files in Node.js",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
