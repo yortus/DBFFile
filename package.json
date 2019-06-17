@@ -1,7 +1,7 @@
 {
   "name": "dbffile",
   "version": "0.7.6",
-  "description": "",
+  "description": "Read and write .dbf (dBase III) files in Node.js",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "scripts": {
@@ -40,5 +40,8 @@
     "ncp": "^2.0.0",
     "rimraf": "^2.6.3",
     "typescript": "^3.5.1"
+  },
+  "dependencies": {
+    "iconv-lite": "^0.4.24"
   }
 }

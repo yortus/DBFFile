@@ -14,7 +14,7 @@ Read and write .dbf (dBase III) files in Node.js:
   - Can use field descriptors from a hash of from another instance
 - Can append records to an existing .dbf file
   - Supports very large files
-- All operations are asyncronous and return a promise
+- All operations are asynchronous and return a promise
 
 ### Installation
 
@@ -66,10 +66,10 @@ The module exports the `DBFFile` class, which has the following shape:
 class DBFFile {
 
     /** Opens an existing DBF file. */
-    static open(path: string): Promise<DBFFile>;
+    static open(path: string, options?: Options): Promise<DBFFile>;
 
     /** Creates a new DBF file with no records. */
-    static create(path: string, fields: Field[]): Promise<DBFFile>;
+    static create(path: string, fields: Field[], options?: Options): Promise<DBFFile>;
 
     /** Full path to the DBF file. */
     path: string;
