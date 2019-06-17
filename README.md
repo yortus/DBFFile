@@ -11,9 +11,14 @@ Read and write .dbf (dBase III) files in Node.js:
   - Can read records in arbitrary-sized batches
   - Supports very large files
 - Can create a new .dbf file
-  - Can use field descriptors from a hash of from another instance
+  - Can use field descriptors from a user-specified object of from another instance
 - Can append records to an existing .dbf file
   - Supports very large files
+- Can specify character encodings either per-file or per-field.
+  - the default encoding is `'ISO-8859-1'` (also known as latin 1)
+  - example per-file encoding: `DBFFile.open(<path>, {encoding: 'EUC-JP'})`
+  - example per-field encoding: `DBFFile.open(<path>, {encoding: {default: 'latin1', FIELD_XYZ: 'EUC-JP'}})`
+  - supported encodings are listed [here](https://github.com/ashtuchkin/iconv-lite/wiki/Supported-Encodings).
 - All operations are asynchronous and return a promise
 
 ### Installation
@@ -82,7 +87,7 @@ class DBFFile {
         name: string;
         type: string;
         size: number;
-        decs: number;
+        decimalPlaces?: number;
     }>;
 
     /** Reads a subset of records from this DBF file. */
