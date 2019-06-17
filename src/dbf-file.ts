@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import * as iconv from 'iconv-lite';
-import {FieldDescriptor} from './field-descriptor';
-import {Options, normaliseOptions} from './options';
+import {FieldDescriptor, validateFieldDescriptor} from './field-descriptor';
+import {Encoding, Options, normaliseOptions} from './options';
 import {close, formatDate, open, read, parseDate, write} from './utils';
 
 
@@ -29,18 +29,18 @@ export class DBFFile {
     /** Metadata for all fields defined in the DBF file. */
     fields = [] as FieldDescriptor[];
 
-    /** Appends the specified records to this DBF file. */
-    appendRecords(records: any[]) {
-        return appendRecordsToDBF(this, records);
-    }
-
     /** Reads a subset of records from this DBF file. */
     readRecords(maxCount = 10000000) {
         return readRecordsFromDBF(this, maxCount);
     }
 
+    /** Appends the specified records to this DBF file. */
+    appendRecords(records: any[]) {
+        return appendRecordsToDBF(this, records);
+    }
+
     // Private.
-    _encoding = '';
+    _encoding = '' as Encoding;
     _recordsRead = 0;
     _headerLength = 0;
     _recordLength = 0;
@@ -73,10 +73,10 @@ async function openDBF(path: string, options: Options): Promise<DBFFile> {
             await read(fd, buffer, 0, 32, 32 + fields.length * 32);
             if (buffer.readUInt8(0) === 0x0D) break;
             let field: FieldDescriptor = {
-                name: iconv.decode(buffer.slice(0, 10), options.encoding).split('\0')[0],
+                name: iconv.decode(buffer.slice(0, 10), 'ISO-8859-1').split('\0')[0],
                 type: String.fromCharCode(buffer[0x0B]) as FieldDescriptor['type'],
                 size: buffer.readUInt8(0x10),
-                decs: buffer.readUInt8(0x11)
+                decimalPlaces: buffer.readUInt8(0x11)
             };
             assert(fields.every(f => f.name !== field.name), `Duplicate field name: '${field.name}'`);
             fields.push(field);
@@ -114,7 +114,7 @@ async function createDBF(path: string, fields: FieldDescriptor[], options: Optio
     let fd = 0;
     try {
         // Validate the field metadata.
-        validateFields(fields);
+        validateFieldDescriptorss(fields);
 
         // Create the file and create a buffer to write through.
         fd = await open(path, 'wx');
@@ -140,15 +140,15 @@ async function createDBF(path: string, fields: FieldDescriptor[], options: Optio
 
         // Write the field descriptors.
         for (let i = 0; i < fields.length; ++i) {
-            let name = fields[i].name, type = fields[i].type, size = fields[i].size, decs = fields[i].decs || 0;
-            iconv.encode(name, options.encoding).copy(buffer, 0);   // Field name (up to 10 chars)
+            let {name, type, size, decimalPlaces} = fields[i];
+            iconv.encode(name, 'ISO-8859-1').copy(buffer, 0);       // Field name (up to 10 chars)
             for (let j = name.length; j < 11; ++j) {                // null terminator(s)
                 buffer.writeUInt8(0, j);
             }
             buffer.writeUInt8(type.charCodeAt(0), 0x0B);            // Field type
             buffer.writeUInt32LE(0, 0x0C);                          // Field data address (set to zero)
             buffer.writeUInt8(size, 0x10);                          // Field length
-            buffer.writeUInt8(decs, 0x11);                          // Decimal count
+            buffer.writeUInt8(decimalPlaces || 0, 0x11);            // Decimal count
             buffer.writeUInt16LE(0, 0x12);                          // Reserved (set to zero)
             buffer.writeUInt8(0x01, 0x14);                          // Work area ID (always 01h for dBase III)
             buffer.writeUInt16LE(0, 0x15);                          // Reserved (set to zero)
@@ -185,6 +185,104 @@ async function createDBF(path: string, fields: FieldDescriptor[], options: Optio
 
 
 
+// Private implementation of DBFFile#readRecords
+async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
+    let fd = 0;
+    try {
+        // Open the file and prepare to create a buffer to read through.
+        fd = await open(dbf.path, 'r');
+        let recordCountPerBuffer = 1000;
+        let recordLength = dbf._recordLength;
+        let buffer = Buffer.alloc(recordLength * recordCountPerBuffer);
+
+        // Calculate the file position at which to start reading.
+        let currentPosition = dbf._headerLength + recordLength * dbf._recordsRead;
+
+        // Create a convenience function for extracting strings from the buffer.
+        let substr = (start: number, len: number, enc: string) => iconv.decode(buffer.slice(start, start + len), enc);
+
+        // Read records in chunks, until enough records have been read.
+        let records: Array<Record<string, unknown>> = [];
+        while (true) {
+
+            // Work out how many records to read in this chunk.
+            let maxRecords1 = dbf.recordCount - dbf._recordsRead;
+            let maxRecords2 = maxCount - records.length;
+            let recordCountToRead = maxRecords1 < maxRecords2 ? maxRecords1 : maxRecords2;
+            if (recordCountToRead > recordCountPerBuffer) recordCountToRead = recordCountPerBuffer;
+
+            // Quit when there are no more records to read.
+            if (recordCountToRead === 0) break;
+
+            // Read the chunk of records into the buffer.
+            await read(fd, buffer, 0, recordLength * recordCountToRead, currentPosition);
+            dbf._recordsRead += recordCountToRead;
+            currentPosition += recordLength * recordCountToRead;
+
+            // Parse each record.
+            for (let i = 0, offset = 0; i < recordCountToRead; ++i) {
+                let record: Record<string, unknown> = {};
+                let isDeleted = (buffer[offset++] === 0x2a);
+                if (isDeleted) { offset += recordLength - 1; continue; }
+
+                // Parse each field.
+                for (let j = 0; j < dbf.fields.length; ++j) {
+                    let field = dbf.fields[j];
+                    let len = field.size;
+                    let value: any = null;
+                    let encoding = getEncodingForField(field, dbf._encoding);
+
+                    // Decode the field from the buffer, according to its type.
+                    switch (field.type) {
+                        case 'C': // Text
+                            while (len > 0 && buffer[offset + len - 1] === 0x20) --len;
+                            value = substr(offset, len, encoding);
+                            offset += field.size;
+                            break;
+                        case 'N': // Number
+                            while (len > 0 && buffer[offset] === 0x20) ++offset, --len;
+                            value = len > 0 ? parseFloat(substr(offset, len, encoding)) : null;
+                            offset += len;
+                            break;
+                        case 'L': // Boolean
+                        let c = String.fromCharCode(buffer[offset++]);
+                            value = 'TtYy'.indexOf(c) >= 0 ? true : ('FfNn'.indexOf(c) >= 0 ? false : null);
+                            break;
+                        case 'D': // Date
+                            value = buffer[offset] === 0x20 ? null : parseDate(substr(offset, 8, encoding));
+                            offset += 8;
+                            break;
+                        case 'I': // Integer
+                            value = buffer.readInt32LE(offset);
+                            offset += field.size;
+                            break;
+                        default:
+                            throw new Error(`Type '${field.type}' is not supported`);
+                    }
+                    record[field.name] = value;
+                }
+
+                //add the record to the result.
+                records.push(record);
+            }
+
+            // Allocate a new buffer, so that all the raw buffer slices created above are not overwritten.
+            buffer = Buffer.alloc(recordLength * recordCountPerBuffer);
+        }
+
+        // Return all the records that were read.
+        return records;
+    }
+    finally {
+        // Close the file.
+        if (fd) await close(fd);
+    }
+};
+
+
+
+
+// Private implementation of DBFFile#appendRecords
 async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, unknown>>): Promise<DBFFile> {
     let fd = 0;
     try {
@@ -212,12 +310,13 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
                 let field = dbf.fields[j];
                 let value: any = record[field.name];
                 if (value === null || typeof value === 'undefined') value = '';
+                let encoding = getEncodingForField(field, dbf._encoding);
 
                 // Encode the field in the buffer, according to its type.
                 switch (field.type) {
 
                     case 'C': // Text
-                        let b = iconv.encode(value, dbf._encoding);
+                        let b = iconv.encode(value, encoding);
                         for (let k = 0; k < field.size; ++k) {
                             let byte = k < value.length ? b[k] : 0x20;
                             buffer.writeUInt8(byte, offset++);
@@ -228,7 +327,7 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
                         value = value.toString();
                         value = value.slice(0, field.size);
                         while (value.length < field.size) value = ' ' + value;
-                        iconv.encode(value, dbf._encoding).copy(buffer, offset, 0, field.size);
+                        iconv.encode(value, encoding).copy(buffer, offset, 0, field.size);
                         offset += field.size;
                         break;
 
@@ -238,7 +337,7 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
 
                     case 'D': // Date
                         value = value ? formatDate(value) : '        ';
-                        iconv.encode(value, dbf._encoding).copy(buffer, offset, 0, 8);
+                        iconv.encode(value, encoding).copy(buffer, offset, 0, 8);
                         offset += 8;
                         break;
 
@@ -276,132 +375,16 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
 
 
 
-async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
-    let fd = 0;
-    try {
-        // Open the file and prepare to create a buffer to read through.
-        fd = await open(dbf.path, 'r');
-        let recordCountPerBuffer = 1000;
-        let recordLength = dbf._recordLength;
-        let buffer = Buffer.alloc(recordLength * recordCountPerBuffer);
-
-        // Calculate the file position at which to start reading.
-        let currentPosition = dbf._headerLength + recordLength * dbf._recordsRead;
-
-        // Create a convenience function for extracting strings from the buffer.
-        let substr = (start: number, count: number) => iconv.decode(buffer.slice(start, start + count), dbf._encoding);
-
-        // Read records in chunks, until enough records have been read.
-        let records: Array<Record<string, unknown>> = [];
-        while (true) {
-
-            // Work out how many records to read in this chunk.
-            let maxRecords1 = dbf.recordCount - dbf._recordsRead;
-            let maxRecords2 = maxCount - records.length;
-            let recordCountToRead = maxRecords1 < maxRecords2 ? maxRecords1 : maxRecords2;
-            if (recordCountToRead > recordCountPerBuffer) recordCountToRead = recordCountPerBuffer;
-
-            // Quit when there are no more records to read.
-            if (recordCountToRead === 0) break;
-
-            // Read the chunk of records into the buffer.
-            await read(fd, buffer, 0, recordLength * recordCountToRead, currentPosition);
-            dbf._recordsRead += recordCountToRead;
-            currentPosition += recordLength * recordCountToRead;
-
-            // Parse each record.
-            for (let i = 0, offset = 0; i < recordCountToRead; ++i) {
-                let record: Record<string, unknown> = {};
-                let isDeleted = (buffer[offset++] === 0x2a);
-                if (isDeleted) { offset += recordLength - 1; continue; }
-
-                // Parse each field.
-                for (let j = 0; j < dbf.fields.length; ++j) {
-                    let field = dbf.fields[j];
-                    let len = field.size, value: any = null;
-
-                    // Decode the field from the buffer, according to its type.
-                    switch (field.type) {
-                        case 'C': // Text
-                            while (len > 0 && buffer[offset + len - 1] === 0x20) --len;
-                            value = substr(offset, len);
-                            offset += field.size;
-                            break;
-                        case 'N': // Number
-                            while (len > 0 && buffer[offset] === 0x20) ++offset, --len;
-                            value = len > 0 ? parseFloat(substr(offset, len)) : null;
-                            offset += len;
-                            break;
-                        case 'L': // Boolean
-                        let c = String.fromCharCode(buffer[offset++]);
-                            value = 'TtYy'.indexOf(c) >= 0 ? true : ('FfNn'.indexOf(c) >= 0 ? false : null);
-                            break;
-                        case 'D': // Date
-                            value = buffer[offset] === 0x20 ? null : parseDate(substr(offset, 8));
-                            offset += 8;
-                            break;
-                        case 'I': // Integer
-                            value = buffer.readInt32LE(offset);
-                            offset += field.size;
-                            break;
-                        default:
-                            throw new Error(`Type '${field.type}' is not supported`);
-                    }
-                    record[field.name] = value;
-                }
-
-                //add the record to the result.
-                records.push(record);
-            }
-
-            // Allocate a new buffer, so that all the raw buffer slices created above are not overwritten.
-            buffer = Buffer.alloc(recordLength * recordCountPerBuffer);
-        }
-
-        // Return all the records that were read.
-        return records;
-    }
-    finally {
-        // Close the file.
-        if (fd) await close(fd);
-    }
-};
-
-
-
-
-function validateFields(fields: FieldDescriptor[]): void {
+// Private helper function
+function validateFieldDescriptorss(fields: FieldDescriptor[]): void {
     if (fields.length > 2046) throw new Error('Too many fields (maximum is 2046)');
-    for (let i = 0; i < fields.length; ++i) {
-        let name = fields[i].name, type = fields[i].type, size = fields[i].size, decs = fields[i].decs;
-
-        // name
-        if (typeof name !== 'string') throw new Error('Name must be a string');
-        if (name.length < 1) throw new Error(`Field name '${name}' is too short (minimum is 1 char)`);
-        if (name.length > 10) throw new Error(`Field name '${name}' is too long (maximum is 10 chars)`);
-
-        // type
-        if (typeof type !== 'string' || type.length !== 1) throw new Error('Type must be a single character');
-        if (['C', 'N', 'L', 'D', 'I'].indexOf(type) === -1) throw new Error(`Type '${type}' is not supported`);
-
-        // size
-        if (typeof size !== 'number') throw new Error('Size must be a number');
-        if (size < 1) throw new Error('Field size is too small (minimum is 1)');
-        if (type === 'C' && size > 255) throw new Error('Field size is too large (maximum is 255)');
-        if (type === 'N' && size > 20) throw new Error('Field size is too large (maximum is 20)');
-        if (type === 'L' && size !== 1) throw new Error('Invalid field size (must be 1)');
-        if (type === 'D' && size !== 8) throw new Error('Invalid field size (must be 8)');
-        if (type === 'I' && size !== 4) throw new Error('Invalid field size (must be 4)');
-
-        // decs
-        if (decs !== undefined && typeof decs !== 'number') throw new Error('Decs must be undefined or a number');
-        if (decs && decs > 15) throw new Error('Decimal count is too large (maximum is 15)');
-    }
+    for (let field of fields) validateFieldDescriptor(field);
 }
 
 
 
 
+// Private helper function
 function validateRecord(fields: FieldDescriptor[], record: Record<string, unknown>): void {
     for (let i = 0; i < fields.length; ++i) {
         let name = fields[i].name, type = fields[i].type;
@@ -427,8 +410,18 @@ function validateRecord(fields: FieldDescriptor[], record: Record<string, unknow
 
 
 
+// Private helper function
 function calculateRecordLengthInBytes(fields: FieldDescriptor[]): number {
     let len = 1; // 'Record deleted flag' adds one byte
     for (let i = 0; i < fields.length; ++i) len += fields[i].size;
     return len;
+}
+
+
+
+
+// Private helper function
+function getEncodingForField(field: FieldDescriptor, encoding: Encoding) {
+    if (typeof encoding === 'string') return encoding;
+    return encoding[field.name] || encoding.default;
 }

@@ -48,7 +48,14 @@ describe('Reading a DBF file', () => {
             filename: 'WSPMST.dbf',
             options: {encoding: 'tis620'},
             recordCount: 6802,
-            firstRecord: {DISPNAME: 'รองเท้าบุรุษADDA 61S02-M1', GROUP: '5', LEVEL: 'N'},
+            firstRecord: {DISPNAME: 'รองเท้าบุรุษADDA 61S02-M1', PNAME: 'รองเท้า CASUAL', GROUP: '5', LEVEL: 'N'},
+            deletedCount: 6302,
+        },
+        {
+            filename: 'WSPMST.dbf',
+            options: {encoding: {default: 'tis620', PNAME: 'latin1'}},
+            recordCount: 6802,
+            firstRecord: {DISPNAME: 'รองเท้าบุรุษADDA 61S02-M1', PNAME: 'ÃÍ§à·éÒ CASUAL'},
             deletedCount: 6302,
         },
     ];

@@ -85,10 +85,10 @@ class DBFFile {
         decs: number;
     }>;
 
-    /** Appends the specified records to this DBF file. */
-    appendRecords(records: object[]): Promise<DBFFile>;
-
     /** Reads a subset of records from this DBF file. */
     readRecords(maxCount?: number): Promise<object[]>;
+
+    /** Appends the specified records to this DBF file. */
+    appendRecords(records: object[]): Promise<DBFFile>;
 }
 ```
