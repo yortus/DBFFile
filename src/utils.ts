@@ -38,5 +38,5 @@ export function parseDate(s: string): Date {
 
 /** Formats the given date as a string, in 8-character 'YYYYMMDD' format. */
 export function formatDate(d: Date): string {
-    return d.toISOString().slice(0, 10).replace(/\-/, '');
+    return d.toISOString().slice(0, 10).replace(/-/g, '');
 }
