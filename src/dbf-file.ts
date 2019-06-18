@@ -1,5 +1,6 @@
 import * as assert from 'assert';
 import * as iconv from 'iconv-lite';
+import {extname} from 'path';
 import {FieldDescriptor, validateFieldDescriptor} from './field-descriptor';
 import {Encoding, Options, normaliseOptions} from './options';
 import {close, formatDate, open, read, parseDate, write} from './utils';
@@ -44,6 +45,7 @@ export class DBFFile {
     _recordsRead = 0;
     _headerLength = 0;
     _recordLength = 0;
+    _memoPath? = '';
 }
 
 
@@ -59,13 +61,18 @@ async function openDBF(path: string, options: Options): Promise<DBFFile> {
 
         // Read various properties from the header record.
         await read(fd, buffer, 0, 32, 0);
-        let fileVersion = buffer.readInt8(0);
+        let fileVersion = buffer.readUInt8(0);
         let recordCount = buffer.readInt32LE(4);
         let headerLength = buffer.readInt16LE(8);
         let recordLength = buffer.readInt16LE(10);
+        let memoPath: string | undefined;
 
-        // Ensure the file version is a supported one.
-        assert(fileVersion === 0x03, `File '${path}' has unknown/unsupported dBase version: ${fileVersion}.`);
+        // Ensure the file version is a supported one. Also locate the memo file, if any.
+        switch (fileVersion) {
+            case 0x03: memoPath = undefined; break;
+            case 0x83: memoPath = path.slice(0, -extname(path).length) + '.dbt'; break;
+            default: throw new Error(`File '${path}' has unknown/unsupported dBase version: ${fileVersion}.`);
+        }
 
         // Parse all field descriptors.
         let fields: FieldDescriptor[] = [];
@@ -89,7 +96,6 @@ async function openDBF(path: string, options: Options): Promise<DBFFile> {
         // Validate the record length.
         assert(recordLength === calculateRecordLengthInBytes(fields), 'Invalid DBF: Incorrect record length');
 
-
         // Return a new DBFFile instance.
         let result = new DBFFile();
         result.path = path;
@@ -99,6 +105,7 @@ async function openDBF(path: string, options: Options): Promise<DBFFile> {
         result._recordsRead = 0;
         result._headerLength = headerLength;
         result._recordLength = recordLength;
+        result._memoPath = memoPath;
         return result;
     }
     finally {
@@ -114,7 +121,11 @@ async function createDBF(path: string, fields: FieldDescriptor[], options: Optio
     let fd = 0;
     try {
         // Validate the field metadata.
-        validateFieldDescriptorss(fields);
+        validateFieldDescriptors(fields);
+
+        // Disallow creation of DBF files with memo fields.
+        // TODO: Lift this restriction when memo support is fully implemented.
+        if (fields.some(f => f.type === 'M')) throw new Error(`Writing to files with memo fields is not supported.`);
 
         // Create the file and create a buffer to write through.
         fd = await open(path, 'wx');
@@ -188,12 +199,27 @@ async function createDBF(path: string, fields: FieldDescriptor[], options: Optio
 // Private implementation of DBFFile#readRecords
 async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
     let fd = 0;
+    let memoFd = 0;
     try {
         // Open the file and prepare to create a buffer to read through.
         fd = await open(dbf.path, 'r');
         let recordCountPerBuffer = 1000;
         let recordLength = dbf._recordLength;
         let buffer = Buffer.alloc(recordLength * recordCountPerBuffer);
+
+        // If there is a memo file, open it and get the block size.
+        // NB: The code below assumes the block size is at offset 4 in the .dbt, and defaults to 512 if all zeros.
+        //     Sources differ about whether the offset is 4 or 6, and no sources mention a default if all zeros.
+        //     However the assumptions here work with our one and only fixture memo file. The format likely differs
+        //     by version. Need more documentation and/or test data to validate or fix these assumptions.
+        let memoBlockSize = 0;
+        let memoBuf!: Buffer;
+        if (dbf._memoPath) {
+            memoFd = await open(dbf._memoPath, 'r');
+            await read(memoFd, buffer, 0, 2, 4);
+            memoBlockSize = buffer.readInt16BE(0) || 512;
+            memoBuf = Buffer.alloc(memoBlockSize);
+        }
 
         // Calculate the file position at which to start reading.
         let currentPosition = dbf._headerLength + recordLength * dbf._recordsRead;
@@ -257,7 +283,26 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             value = buffer.readInt32LE(offset);
                             offset += field.size;
                             break;
-                        default:
+                        case 'M': // Memo
+                            while (len > 0 && buffer[offset] === 0x20) ++offset, --len;
+                            if (len === 0) { value = null; break; }
+                            let blockIndex = parseInt(substr(offset, len, encoding));
+                            offset += len;
+
+                            // Read the memo data from the memo file.
+                            // NB: Some sources indicate that each block has a block header that states the data length.
+                            // Our fixture data doesn't have that - rather, the data is terminated with 0x1A. The format
+                            // likely differs by version. Need more documentation and/or test data to figure this out.
+                            value = '';
+                            while (true) {
+                                await read(memoFd, memoBuf, 0, memoBlockSize, blockIndex * memoBlockSize);
+                                let eos = memoBuf.indexOf(0x1A);
+                                value += iconv.decode(memoBuf.slice(0, eos === -1 ? memoBlockSize : eos), encoding);
+                                if (eos !== -1) break;
+                                ++blockIndex;
+                            }
+                            break;
+                    default:
                             throw new Error(`Type '${field.type}' is not supported`);
                     }
                     record[field.name] = value;
@@ -266,17 +311,15 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                 //add the record to the result.
                 records.push(record);
             }
-
-            // Allocate a new buffer, so that all the raw buffer slices created above are not overwritten.
-            buffer = Buffer.alloc(recordLength * recordCountPerBuffer);
         }
 
         // Return all the records that were read.
         return records;
     }
     finally {
-        // Close the file.
+        // Close the file(s).
         if (fd) await close(fd);
+        if (memoFd) await close(memoFd);
     }
 };
 
@@ -348,6 +391,11 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
                         offset += field.size;
                         break;
 
+                    case 'M': // Memo
+                        // Disallow writing to DBF files with memo fields.
+                        // TODO: Lift this restriction when memo support is fully implemented.
+                        throw new Error(`Writing to files with memo fields is not supported.`);
+
                     default:
                         throw new Error(`Type '${field.type}' is not supported`);
                 }
@@ -378,7 +426,7 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
 
 
 // Private helper function
-function validateFieldDescriptorss(fields: FieldDescriptor[]): void {
+function validateFieldDescriptors(fields: FieldDescriptor[]): void {
     if (fields.length > 2046) throw new Error('Too many fields (maximum is 2046)');
     for (let field of fields) validateFieldDescriptor(field);
 }
