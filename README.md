@@ -93,16 +93,34 @@ class DBFFile {
 
     /** Metadata for all fields defined in the DBF file. */
     fields: Array<{
+
+        /** The name of the field. Must be no longer than 10 characters. */
         name: string;
+
+        /**
+         * The single-letter code for the field type.
+         * C=string, N=numeric, F=float, I=integer, L=logical, D=date, M=memo.
+         */
         type: string;
+
+        /** The size of the field in bytes. */
         size: number;
+
+        /** The number of decimal places. Optional; only used for some field types. */
         decimalPlaces?: number;
     }>;
 
-    /** Reads a subset of records from this DBF file. */
+    /** Reads a subset of records from this DBF file. The current read position is remembered between calls. */
     readRecords(maxCount?: number): Promise<object[]>;
 
     /** Appends the specified records to this DBF file. */
     appendRecords(records: object[]): Promise<DBFFile>;
+}
+
+/** Options that may be passed to `DBFFile.open` and `DBFFile.create`. */
+interface Options {
+
+    /** The character encoding(s) to use when reading/writing the DBF file. */
+    encoding?: string | {default: string, [fieldName: string]: string};
 }
 ```
