@@ -83,7 +83,7 @@ class DBFFile {
     static open(path: string, options?: Options): Promise<DBFFile>;
 
     /** Creates a new DBF file with no records. */
-    static create(path: string, fields: Field[], options?: Options): Promise<DBFFile>;
+    static create(path: string, fields: FieldDescriptor[], options?: Options): Promise<DBFFile>;
 
     /** Full path to the DBF file. */
     path: string;
@@ -92,23 +92,7 @@ class DBFFile {
     recordCount: number;
 
     /** Metadata for all fields defined in the DBF file. */
-    fields: Array<{
-
-        /** The name of the field. Must be no longer than 10 characters. */
-        name: string;
-
-        /**
-         * The single-letter code for the field type.
-         * C=string, N=numeric, F=float, I=integer, L=logical, D=date, M=memo.
-         */
-        type: string;
-
-        /** The size of the field in bytes. */
-        size: number;
-
-        /** The number of decimal places. Optional; only used for some field types. */
-        decimalPlaces?: number;
-    }>;
+    fields: FieldDescriptor[];
 
     /** Reads a subset of records from this DBF file. The current read position is remembered between calls. */
     readRecords(maxCount?: number): Promise<object[]>;
@@ -116,6 +100,27 @@ class DBFFile {
     /** Appends the specified records to this DBF file. */
     appendRecords(records: object[]): Promise<DBFFile>;
 }
+
+
+/** Metadata describing a single field in a DBF file. */
+export interface FieldDescriptor {
+
+    /** The name of the field. Must be no longer than 10 characters. */
+    name: string;
+
+    /**
+     * The single-letter code for the field type.
+     * C=string, N=numeric, F=float, I=integer, L=logical, D=date, M=memo.
+     */
+    type: 'C' | 'N' | 'F' | 'L' | 'D' | 'I' | 'M';
+
+    /** The size of the field in bytes. */
+    size: number;
+
+    /** The number of decimal places. Optional; only used for some field types. */
+    decimalPlaces?: number;
+}
+
 
 /** Options that may be passed to `DBFFile.open` and `DBFFile.create`. */
 interface Options {
