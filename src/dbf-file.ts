@@ -46,6 +46,7 @@ export class DBFFile {
     _headerLength = 0;
     _recordLength = 0;
     _memoPath? = '';
+    _version? = 0;
 }
 
 
@@ -71,6 +72,7 @@ async function openDBF(path: string, options: Options): Promise<DBFFile> {
         switch (fileVersion) {
             case 0x03: memoPath = undefined; break;
             case 0x83: memoPath = path.slice(0, -extname(path).length) + '.dbt'; break;
+            case 0x8b: memoPath = path.slice(0, -extname(path).length) + '.dbt'; break;
             default: throw new Error(`File '${path}' has unknown/unsupported dBase version: ${fileVersion}.`);
         }
 
@@ -106,6 +108,7 @@ async function openDBF(path: string, options: Options): Promise<DBFFile> {
         result._headerLength = headerLength;
         result._recordLength = recordLength;
         result._memoPath = memoPath;
+        result._version = fileVersion;
         return result;
     }
     finally {
@@ -250,6 +253,8 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                 let record: Record<string, unknown> = {};
                 let isDeleted = (buffer[offset++] === 0x2a);
                 if (isDeleted) { offset += recordLength - 1; continue; }
+                let has_contiguous_block = false;
+                let length = 0;
 
                 // Parse each field.
                 for (let j = 0; j < dbf.fields.length; ++j) {
@@ -296,9 +301,42 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             value = '';
                             while (true) {
                                 await read(memoFd, memoBuf, 0, memoBlockSize, blockIndex * memoBlockSize);
-                                let eos = memoBuf.indexOf(0x1A);
-                                value += iconv.decode(memoBuf.slice(0, eos === -1 ? memoBlockSize : eos), encoding);
-                                if (eos !== -1) break;
+                                if (dbf._version === 0x8b) {
+                                    // According to http://web.tiscali.it/SilvioPitti/
+                                    // See README.html
+                                    let used_block_reserved_1 = memoBuf.readUInt8(0)
+                                    let used_block_reserved_2 = memoBuf.readUInt8(1)
+                                    let used_block_reserved_3 = memoBuf.readUInt8(2)
+                                    let used_block_reserved_4 = memoBuf.readUInt8(3)
+                                    let used_block = (used_block_reserved_1 === 0xff &&
+                                                     used_block_reserved_2 === 0xff &&
+                                                     used_block_reserved_3 === 0x8 &&
+                                                     used_block_reserved_4 === 0x0);
+                                    if (used_block) {
+                                        has_contiguous_block = false;
+                                        length = memoBuf.readUInt32LE(4)
+                                        value = iconv.decode(memoBuf.slice(8, length), encoding);
+                                        if (length < memoBlockSize) break;
+                                        if (value.length < length) {
+                                            has_contiguous_block = true;
+                                            length-=value.length;
+                                        }
+                                    } else if (has_contiguous_block) {
+                                        let chunk = iconv.decode(memoBuf.slice(0, length), encoding);
+                                        value += chunk;
+                                        length-=chunk.length;
+                                        if (length <= 0) {
+                                            value = value.substring(0, value.length - 8)
+                                            break;
+                                        }
+                                    } else {
+                                        break;
+                                    }
+                                } else {
+                                    let eos = memoBuf.indexOf(0x1A);
+                                    value += iconv.decode(memoBuf.slice(0, eos === -1 ? memoBlockSize : eos), encoding);
+                                    if (eos !== -1) break;
+                                }
                                 ++blockIndex;
                             }
                             break;
