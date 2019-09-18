@@ -1,12 +1,12 @@
 {
     "compilerOptions": {
-        "target": "es6",
+        "target": "es2017",
         "module": "commonjs",
         "removeComments": false,
         "sourceMap": true,
         "declaration": true,
         "outDir": "../dist/test",
-        "lib": ["es6"],
+        "lib": ["es2017"],
 
         "strict": true,
         "noUnusedLocals": true,
