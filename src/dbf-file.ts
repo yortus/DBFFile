@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import * as iconv from 'iconv-lite';
 import {extname} from 'path';
 import {FieldDescriptor, validateFieldDescriptor} from './field-descriptor';
+import {FileVersion, isValidFileVersion} from './file-version';
 import {Encoding, Options, normaliseOptions} from './options';
 import {close, formatDate, open, read, parseDate, write} from './utils';
 
@@ -68,15 +69,18 @@ async function openDBF(path: string, options: Options): Promise<DBFFile> {
         let recordLength = buffer.readInt16LE(10);
         let memoPath: string | undefined;
 
-        // Ensure the file version is a supported one. Also locate the memo file, if any.
-        switch (fileVersion) {
-            case 0x03: memoPath = undefined; break;
-            case 0x83: memoPath = path.slice(0, -extname(path).length) + '.dbt'; break;
-            case 0x8b: memoPath = path.slice(0, -extname(path).length) + '.dbt'; break;
-            default: throw new Error(`File '${path}' has unknown/unsupported dBase version: ${fileVersion}.`);
+        // Validate the file version. Also locate the memo file, if any.
+        if (!isValidFileVersion(fileVersion)) {
+            throw new Error(`File '${path}' has unknown/unsupported dBase version: ${fileVersion}.`);
+        }
+        else if (fileVersion === 0x83 || fileVersion === 0x8b) {
+            memoPath = path.slice(0, -extname(path).length) + '.dbt';
+        }
+        if (options.fileVersion && fileVersion !== options.fileVersion) {
+            throw new Error(`File '${path}: expected version ${options.fileVersion} but found ${fileVersion}`);
         }
 
-        // Parse all field descriptors.
+        // Parse and validate all field descriptors.
         let fields: FieldDescriptor[] = [];
         while (headerLength > 32 + fields.length * 32) {
             await read(fd, buffer, 0, 32, 32 + fields.length * 32);
@@ -87,6 +91,7 @@ async function openDBF(path: string, options: Options): Promise<DBFFile> {
                 size: buffer.readUInt8(0x10),
                 decimalPlaces: buffer.readUInt8(0x11)
             };
+            validateFieldDescriptor(fileVersion, field);
             assert(fields.every(f => f.name !== field.name), `Duplicate field name: '${field.name}'`);
             fields.push(field);
         }
@@ -124,7 +129,8 @@ async function createDBF(path: string, fields: FieldDescriptor[], options: Optio
     let fd = 0;
     try {
         // Validate the field metadata.
-        validateFieldDescriptors(fields);
+        let fileVersion = options.fileVersion || 0x03;
+        validateFieldDescriptors(fileVersion, fields);
 
         // Disallow creation of DBF files with memo fields.
         // TODO: Lift this restriction when memo support is fully implemented.
@@ -135,7 +141,7 @@ async function createDBF(path: string, fields: FieldDescriptor[], options: Optio
         let buffer = Buffer.alloc(32);
 
         // Write the header structure up to the field descriptors.
-        buffer.writeUInt8(0x03, 0x00);                              // Version (set to dBase III)
+        buffer.writeUInt8(fileVersion, 0x00);                       // Version
         let now = new Date();                                       // date of last update (YYMMDD)
         buffer.writeUInt8(now.getFullYear() - 1900, 0x01);          // YY (year minus 1900)
         buffer.writeUInt8(now.getMonth(), 0x02);                    // MM
@@ -464,9 +470,9 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
 
 
 // Private helper function
-function validateFieldDescriptors(fields: FieldDescriptor[]): void {
+function validateFieldDescriptors(version: FileVersion, fields: FieldDescriptor[]): void {
     if (fields.length > 2046) throw new Error('Too many fields (maximum is 2046)');
-    for (let field of fields) validateFieldDescriptor(field);
+    for (let field of fields) validateFieldDescriptor(version, field);
 }
 
 

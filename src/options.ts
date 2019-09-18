@@ -1,4 +1,5 @@
 import {encodingExists} from 'iconv-lite';
+import {FileVersion} from './file-version';
 
 
 
@@ -6,7 +7,10 @@ import {encodingExists} from 'iconv-lite';
 /** Options for opening or creating a DBF file. */
 export interface Options {
 
-    /** The character encoding(s) to use when reading/writing the DBF file. */
+    /** The file version to open or create. Currently versions 0x03, 0x83 and 0x8b are supported. */
+    fileVersion?: FileVersion;
+
+    /** The character encoding(s) to use when reading/writing the DBF file. Defaults to ISO-8859-1. */
     encoding: Encoding;
 }
 
@@ -43,5 +47,8 @@ export function normaliseOptions(options?: Partial<Options>): Options {
     }
 
     // Return a new options object.
-    return {encoding};
+    return {
+        fileVersion: options.fileVersion,
+        encoding
+    };
 }

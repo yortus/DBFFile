@@ -17,7 +17,7 @@ describe('Writing a DBF file', () => {
         filename: string;
 
         /** The options to use when opening/creating the source/target DBF files. */
-        options?: Options;
+        options?: Partial<Options>;
 
         /** The expected number of records in the source file. */
         recordCount: number;
@@ -73,6 +73,7 @@ describe('Writing a DBF file', () => {
         {
             description: `DBF with memo file (version 0x8b)`,
             filename: 'dbase_8b.dbf',
+            options: {fileVersion: 0x8b},
             recordCount: 0,
             newFields: [],
             newRecord: record => record,

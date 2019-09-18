@@ -1,3 +1,8 @@
+import {FileVersion} from './file-version';
+
+
+
+
 /** Metadata describing a single field in a DBF file. */
 export interface FieldDescriptor {
 
@@ -20,7 +25,7 @@ export interface FieldDescriptor {
 
 
 
-export function validateFieldDescriptor(field: FieldDescriptor): void {
+export function validateFieldDescriptor(version: FileVersion, field: FieldDescriptor): void {
     let {name, type, size, decimalPlaces: decs} = field;
 
     // name
@@ -43,6 +48,7 @@ export function validateFieldDescriptor(field: FieldDescriptor): void {
     if (type === 'M' && size !== 10) throw new Error('Invalid field size (must be 10)');
 
     // decimalPlaces
+    const maxDecimals = version === 0x8b ? 18 : 15;
     if (decs !== undefined && typeof decs !== 'number') throw new Error('decimalPlaces must be undefined or a number');
-    if (decs && decs > 15) throw new Error('Decimal count is too large (maximum is 15)');
+    if (decs && decs > maxDecimals) throw new Error('Decimal count is too large (maximum is 15)');
 }
