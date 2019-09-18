@@ -75,7 +75,7 @@ describe('Reading a DBF file', () => {
             deletedCount: 5,
         },
         {
-            description: 'DBF with memo file',
+            description: 'DBF with memo file (version 0x83)',
             filename: 'dbase_83.dbf',
             recordCount: 67,
             firstRecord: {
@@ -101,7 +101,7 @@ describe('Reading a DBF file', () => {
             deletedCount: 0,
         },
         {
-            description: 'DBF dBase IV 0x8b with memo file',
+            description: 'DBF with memo file (version 0x8b)',
             filename: 'dbase_8b.dbf',
             recordCount: 10,
             firstRecord: {
