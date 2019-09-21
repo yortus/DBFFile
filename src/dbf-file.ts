@@ -4,7 +4,7 @@ import {extname} from 'path';
 import {FieldDescriptor, validateFieldDescriptor} from './field-descriptor';
 import {FileVersion, isValidFileVersion} from './file-version';
 import {Encoding, Options, normaliseOptions} from './options';
-import {close, formatDate, open, read, parseDate, write} from './utils';
+import {close, formatDate, open, read, parseDate, stat, write} from './utils';
 
 
 
@@ -216,18 +216,17 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
         let recordLength = dbf._recordLength;
         let buffer = Buffer.alloc(recordLength * recordCountPerBuffer);
 
-        // If there is a memo file, open it and get the block size.
-        // NB: The code below assumes the block size is at offset 4 in the .dbt, and defaults to 512 if all zeros.
-        //     Sources differ about whether the offset is 4 or 6, and no sources mention a default if all zeros.
-        //     However the assumptions here work with our one and only fixture memo file. The format likely differs
-        //     by version. Need more documentation and/or test data to validate or fix these assumptions.
+        // If there is a memo file, open it and get the block size. Also get the total file size for overflow checking.
+        // The code below assumes the block size is at offset 4 in the .dbt, and defaults to 512 if all zeros.
         let memoBlockSize = 0;
+        let memoFileSize = 0;
         let memoBuf!: Buffer;
         if (dbf._memoPath) {
             memoFd = await open(dbf._memoPath, 'r');
-            await read(memoFd, buffer, 0, 2, 4);
-            memoBlockSize = buffer.readInt16BE(0) || 512;
+            await read(memoFd, buffer, 0, 4, 4);
+            memoBlockSize = buffer.readInt32LE(0) || 512;
             memoBuf = Buffer.alloc(memoBlockSize);
+            memoFileSize = (await stat(dbf._memoPath)).size;
         }
 
         // Calculate the file position at which to start reading.
@@ -259,15 +258,6 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                 let record: Record<string, unknown> = {};
                 let isDeleted = (buffer[offset++] === 0x2a);
                 if (isDeleted) { offset += recordLength - 1; continue; }
-
-
-
-                let hasContiguousBlock = false;
-                let length = 0;
-
-
-
-
 
                 // Parse each field.
                 for (let j = 0; j < dbf.fields.length; ++j) {
@@ -307,49 +297,52 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             let blockIndex = parseInt(substr(offset, len, encoding));
                             offset += len;
 
-                            // Read the memo data from the memo file.
-                            // NB: Some sources indicate that each block has a block header that states the data length.
-                            // Our fixture data doesn't have that - rather, the data is terminated with 0x1A. The format
-                            // likely differs by version. Need more documentation and/or test data to figure this out.
+                            // Start with an empty memo value, and concatenate to it until the memo value is fully read.
                             value = '';
+
+                            // Read the memo data from the memo file. We use a while loop here to read one block-sized
+                            // chunk at a time, since memo values can be larger than the block size.
                             while (true) {
+
+                                // Read the next block-sized chunk from the memo file.
                                 await read(memoFd, memoBuf, 0, memoBlockSize, blockIndex * memoBlockSize);
-                                if (dbf._version === 0x8b) {
-                                    let usedBlockReserved1 = memoBuf.readUInt8(0)
-                                    let usedBlockReserved2 = memoBuf.readUInt8(1)
-                                    let usedBlockReserved3 = memoBuf.readUInt8(2)
-                                    let usedBlockReserved4 = memoBuf.readUInt8(3)
-                                    let usedBlock = (usedBlockReserved1 === 0xff &&
-                                                     usedBlockReserved2 === 0xff &&
-                                                     usedBlockReserved3 === 0x8 &&
-                                                     usedBlockReserved4 === 0x0);
-                                    if (usedBlock) {
-                                        hasContiguousBlock = false;
-                                        length = memoBuf.readUInt32LE(4)
-                                        value = iconv.decode(memoBuf.slice(8, length), encoding);
-                                        if (length < memoBlockSize) break;
-                                        if (value.length < length) {
-                                            hasContiguousBlock = true;
-                                            length -= value.length;
-                                        }
-                                    }
-                                    else if (hasContiguousBlock) {
-                                        let chunk = iconv.decode(memoBuf.slice(0, length), encoding);
-                                        value += chunk;
-                                        length -= chunk.length;
-                                        if (length <= 0) {
-                                            value = value.substring(0, value.length - 8)
-                                            break;
-                                        }
-                                    } else {
-                                        break;
-                                    }
-                                } else {
-                                    let eos = memoBuf.indexOf(0x1A);
+
+                                // Handle first/next block of dBase III memo data.
+                                if (dbf._version === 0x83) {
+                                    // dBase III memos don't have a length header - they are terminated with 0x1A1A.
+                                    // If the terminator is not found in the current block-sized buffer, then the memo
+                                    // value must be larger than a single block size. In that case, we continue the loop
+                                    // and read the next block-sized chunk, and so on until the terminator is found.
+                                    let eos = memoBuf.indexOf('\x1A\x1A');
                                     value += iconv.decode(memoBuf.slice(0, eos === -1 ? memoBlockSize : eos), encoding);
-                                    if (eos !== -1) break;
+                                    if (eos !== -1) break; // stop looping once we've found the terminator.
+                                }
+
+                                // Handle first/next block of dBase III memo data.
+                                else if (dbf._version === 0x8b) {
+                                    // dBase IV memos start with FF-FF-08-00, then a four-byte memo length, which
+                                    // includes eight-byte memo 'header' in the length. The memo length can be larger
+                                    // than a block, so we loop over blocks until done.
+
+                                    // If this is the first block of the memo, then read the field length.
+                                    // Otherwise, we must have already read the length in a previous loop iteration.
+                                    let isFirstBlockOfMemo = memoBuf.readInt32LE(0) === 0x0008FFFF;
+                                    if (isFirstBlockOfMemo) len = memoBuf.readUInt32LE(4) - 8;
+
+                                    // Read the chunk of memo data, and break out of the loop when all read.
+                                    let skip = isFirstBlockOfMemo ? 8 : 0;
+                                    let take = Math.min(len, memoBlockSize - skip);
+                                    value += iconv.decode(memoBuf.slice(skip, skip + take), encoding);
+                                    len -= take;
+                                    if (len === 0) break;
+                                }
+                                else {
+                                    throw new Error(`Reading version ${dbf._version} memo fields is not supported.`);
                                 }
                                 ++blockIndex;
+                                if (blockIndex * memoBlockSize > memoFileSize) {
+                                    throw new Error(`Error reading memo file (read past end).`);
+                                }
                             }
                             break;
                     default:
