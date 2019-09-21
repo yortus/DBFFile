@@ -22,6 +22,12 @@ export const read = promisify(fs.read);
 
 
 
+/** Promisified version of fs.stat. */
+export const stat = promisify(fs.stat);
+
+
+
+
 /** Promisified version of fs.write. */
 export const write = promisify(fs.write);
 

@@ -24,6 +24,9 @@ describe('Reading a DBF file', () => {
         /** Expected field values in the first record. Leave undefined if `error` is defined. */
         firstRecord?: Record<string, unknown>;
 
+        /** Expected field values in the last record. Leave undefined if `error` is defined. */
+        lastRecord?: Record<string, unknown>;
+
         /** Expected count of deleted records in the file. Leave undefined if `error` is defined. */
         deletedCount?: number;
 
@@ -37,6 +40,7 @@ describe('Reading a DBF file', () => {
             filename: 'PYACFL.DBF',
             recordCount: 45,
             firstRecord: { AFCLPD: 'W', AFHRPW: 2.92308, AFLVCL: 0.00, AFCRDA: new Date('1999-03-25'), AFPSDS: '' },
+            lastRecord: { AFCLPD: 'W', AFHRPW: 0, AFLVCL: 0.00, AFCRDA: new Date('1991-04-15'), AFPSDS: '' },
             deletedCount: 30,
         },
         {
@@ -49,7 +53,8 @@ describe('Reading a DBF file', () => {
             filename: 'WSPMST.dbf',
             recordCount: 6802,
             firstRecord: { DISPNAME: 'ÃÍ§à·éÒºØÃØÉADDA 61S02-M1', GROUP: '5', LEVEL: 'N' },
-            deletedCount: 6302,
+            lastRecord: { DISPNAME: '', GROUP: 'W', LEVEL: 'S' },
+            deletedCount: 5,
         },
         {
             description: 'DBF stored with non-default encoding, read using correct encoding',
@@ -57,7 +62,8 @@ describe('Reading a DBF file', () => {
             options: {encoding: 'tis620'},
             recordCount: 6802,
             firstRecord: { DISPNAME: 'รองเท้าบุรุษADDA 61S02-M1', PNAME: 'รองเท้า CASUAL', GROUP: '5', LEVEL: 'N' },
-            deletedCount: 6302,
+            lastRecord: { DISPNAME: '', PNAME: 'รองเท้า B-GRADE', GROUP: 'W', LEVEL: 'S' },
+            deletedCount: 5,
         },
         {
             description: 'DBF read with multiple field-specific encodings',
@@ -65,10 +71,11 @@ describe('Reading a DBF file', () => {
             options: { encoding: { default: 'tis620', PNAME: 'latin1' } },
             recordCount: 6802,
             firstRecord: { DISPNAME: 'รองเท้าบุรุษADDA 61S02-M1', PNAME: 'ÃÍ§à·éÒ CASUAL' },
-            deletedCount: 6302,
+            lastRecord: { DISPNAME: '', PNAME: 'ÃÍ§à·éÒ B-GRADE' },
+            deletedCount: 5,
         },
         {
-            description: 'DBF with memo file',
+            description: 'DBF with memo file (version 0x83)',
             filename: 'dbase_83.dbf',
             recordCount: 67,
             firstRecord: {
@@ -84,6 +91,34 @@ describe('Reading a DBF file', () => {
                 Chocolate, Mocha Bean, Roasted Almond, Triple Chocolate, Chocolate Hazelnut,
                 Grand Orange, Plum Squares, Milk chocolate squares, and Raspberry Blanc.`.replace(/[\r\n]+\s*/g, '\r\n')
             },
+            lastRecord: {
+                ID: 94,
+                CODE: 'BD02',
+                NAME: 'Trio of Biscotti',
+                WEIGHT: 0,
+                DESC: 'This tin is filled with a tempting trio of crunchy pleasures that can be enjoyed by themselves or dunked into fresh cup of coffee. Our perennial favorite Biscotti di Divine returns, chockfull of toasted almonds, flavored with a hint of cinnamon, and half dipped into bittersweet chocolate. Two new twice-baked delights make their debut this season; Heavenly Chocolate Hazelnut and Golden Orange Pignoli. 16 biscotti are packed in a tin.  (1Lb. 2oz.)'
+            },
+            deletedCount: 0,
+        },
+        {
+            description: 'DBF with memo file (version 0x8b)',
+            filename: 'dbase_8b.dbf',
+            recordCount: 10,
+            firstRecord: {
+                CHARACTER: 'One',
+                NUMERICAL: 1,
+                LOGICAL: true,
+                FLOAT: 1.23456789012346,
+                MEMO: 'First memo\r\n'
+            },
+            lastRecord: {
+                CHARACTER: 'Ten records stored in this database',
+                NUMERICAL: 10,
+                DATE: null,
+                LOGICAL: null,
+                FLOAT: 0.1,
+                MEMO: null
+            },
             deletedCount: 0,
         },
     ];
@@ -94,13 +129,15 @@ describe('Reading a DBF file', () => {
             let options = test.options;
             let expectedRecordCount = test.recordCount;
             let expectedFirstRecord: Record<string, unknown> | undefined = test.firstRecord;
+            let expectedLastRecord: Record<string, unknown> | undefined = test.lastRecord;
             let expectedDeletedCount = test.deletedCount;
             let expectedError = test.error;
             try {
                 let dbf = await DBFFile.open(filepath, options);
-                let records = await dbf.readRecords(500);
+                let records = await dbf.readRecords();
                 expect(dbf.recordCount).equals(expectedRecordCount);
                 expect(records[0]).to.deep.include(expectedFirstRecord!);
+                expect(records[records.length - 1]).to.deep.include(expectedLastRecord!);
                 expect(dbf.recordCount - records.length).equals(expectedDeletedCount);
             }
             catch (err) {

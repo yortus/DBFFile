@@ -13,7 +13,7 @@ Read and write .dbf (dBase III) files in Node.js:
   - `D` (date)
   - `M` (memo) Note: memo support is experimental/partial, with the following limitations:
     - read-only (can't create/write DBF files with memo fields)
-    - dBase III file version 0x83 only
+    - dBase III (version 0x83) and dBase IV (version 0x8b) `.dbt` memo files only
 - Can open an existing .dbf file
   - Can access all field descriptors
   - Can access total record count
