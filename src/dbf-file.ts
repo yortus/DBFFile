@@ -405,7 +405,7 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
                     case 'C': // Text
                         let b = iconv.encode(value, encoding);
                         for (let k = 0; k < field.size; ++k) {
-                            let byte = k < value.length ? b[k] : 0x20;
+                            let byte = k < b.length ? b[k] : 0x20;
                             buffer.writeUInt8(byte, offset++);
                         }
                         break;
