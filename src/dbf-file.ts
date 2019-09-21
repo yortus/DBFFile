@@ -259,8 +259,15 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                 let record: Record<string, unknown> = {};
                 let isDeleted = (buffer[offset++] === 0x2a);
                 if (isDeleted) { offset += recordLength - 1; continue; }
-                let has_contiguous_block = false;
+
+
+
+                let hasContiguousBlock = false;
                 let length = 0;
+
+
+
+
 
                 // Parse each field.
                 for (let j = 0; j < dbf.fields.length; ++j) {
@@ -308,29 +315,28 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             while (true) {
                                 await read(memoFd, memoBuf, 0, memoBlockSize, blockIndex * memoBlockSize);
                                 if (dbf._version === 0x8b) {
-                                    // According to http://web.tiscali.it/SilvioPitti/
-                                    // See README.html
-                                    let used_block_reserved_1 = memoBuf.readUInt8(0)
-                                    let used_block_reserved_2 = memoBuf.readUInt8(1)
-                                    let used_block_reserved_3 = memoBuf.readUInt8(2)
-                                    let used_block_reserved_4 = memoBuf.readUInt8(3)
-                                    let used_block = (used_block_reserved_1 === 0xff &&
-                                                     used_block_reserved_2 === 0xff &&
-                                                     used_block_reserved_3 === 0x8 &&
-                                                     used_block_reserved_4 === 0x0);
-                                    if (used_block) {
-                                        has_contiguous_block = false;
+                                    let usedBlockReserved1 = memoBuf.readUInt8(0)
+                                    let usedBlockReserved2 = memoBuf.readUInt8(1)
+                                    let usedBlockReserved3 = memoBuf.readUInt8(2)
+                                    let usedBlockReserved4 = memoBuf.readUInt8(3)
+                                    let usedBlock = (usedBlockReserved1 === 0xff &&
+                                                     usedBlockReserved2 === 0xff &&
+                                                     usedBlockReserved3 === 0x8 &&
+                                                     usedBlockReserved4 === 0x0);
+                                    if (usedBlock) {
+                                        hasContiguousBlock = false;
                                         length = memoBuf.readUInt32LE(4)
                                         value = iconv.decode(memoBuf.slice(8, length), encoding);
                                         if (length < memoBlockSize) break;
                                         if (value.length < length) {
-                                            has_contiguous_block = true;
-                                            length-=value.length;
+                                            hasContiguousBlock = true;
+                                            length -= value.length;
                                         }
-                                    } else if (has_contiguous_block) {
+                                    }
+                                    else if (hasContiguousBlock) {
                                         let chunk = iconv.decode(memoBuf.slice(0, length), encoding);
                                         value += chunk;
-                                        length-=chunk.length;
+                                        length -= chunk.length;
                                         if (length <= 0) {
                                             value = value.substring(0, value.length - 8)
                                             break;
