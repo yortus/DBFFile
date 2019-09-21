@@ -315,7 +315,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                                     // and read the next block-sized chunk, and so on until the terminator is found.
                                     let eos = memoBuf.indexOf('\x1A\x1A');
                                     value += iconv.decode(memoBuf.slice(0, eos === -1 ? memoBlockSize : eos), encoding);
-                                    if (eos !== -1) break; // stop looping once we've found the terminator.
+                                    if (eos !== -1) break; // break out of the loop once we've found the terminator.
                                 }
 
                                 // Handle first/next block of dBase III memo data.
