@@ -1,10 +1,10 @@
 import * as assert from 'assert';
 import * as iconv from 'iconv-lite';
-import {extname} from 'path';
-import {FieldDescriptor, validateFieldDescriptor} from './field-descriptor';
-import {FileVersion, isValidFileVersion} from './file-version';
-import {Encoding, Options, normaliseOptions} from './options';
-import {close, formatDate, open, read, parseDate, stat, write} from './utils';
+import { extname } from 'path';
+import { FieldDescriptor, validateFieldDescriptor } from './field-descriptor';
+import { FileVersion, isValidFileVersion } from './file-version';
+import { Encoding, normaliseOptions, Options } from './options';
+import { close, formatDate, open, parseDate, parseDateTime, read, stat, write } from './utils';
 
 
 
@@ -273,24 +273,46 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             value = substr(offset, len, encoding);
                             offset += field.size;
                             break;
+
                         case 'N': // Number
                         case 'F': // Float - appears to be treated identically to Number
                             while (len > 0 && buffer[offset] === 0x20) ++offset, --len;
                             value = len > 0 ? parseFloat(substr(offset, len, encoding)) : null;
                             offset += len;
                             break;
+
                         case 'L': // Boolean
-                        let c = String.fromCharCode(buffer[offset++]);
+                            let c = String.fromCharCode(buffer[offset++]);
                             value = 'TtYy'.indexOf(c) >= 0 ? true : ('FfNn'.indexOf(c) >= 0 ? false : null);
                             break;
+
+                        case 'T': // DateTime
+                            if (buffer[offset] === 0x20) {
+                                value = null;
+                                break;
+                            }
+
+                            const dateInt = buffer.readInt32LE(offset);
+                            const timeInt = buffer.readInt32LE(offset + 4) + 1;
+                            value = parseDateTime(dateInt, timeInt);
+                            offset += 8;
+                            break;
+
                         case 'D': // Date
                             value = buffer[offset] === 0x20 ? null : parseDate(substr(offset, 8, encoding));
                             offset += 8;
                             break;
+
+                        case 'B': // Double
+                            value = buffer.readDoubleLE(offset);
+                            offset += field.size;
+                            break;
+
                         case 'I': // Integer
                             value = buffer.readInt32LE(offset);
                             offset += field.size;
                             break;
+
                         case 'M': // Memo
                             while (len > 0 && buffer[offset] === 0x20) ++offset, --len;
                             if (len === 0) { value = null; break; }
@@ -345,6 +367,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                                 }
                             }
                             break;
+
                     default:
                             throw new Error(`Type '${field.type}' is not supported`);
                     }

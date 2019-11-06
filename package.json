@@ -6,6 +6,7 @@
   "typings": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p src && tsc -p test && ncp test/fixtures dist/test/fixtures",
+    "dev": "tsc -w -p src && tsc -w -p test && ncp test/fixtures dist/test/fixtures",
     "clean": "rimraf dist/",
     "prepublish": "npm run self-ref && npm run build",
     "test": "mocha --timeout 999999 --colors ./dist/test",

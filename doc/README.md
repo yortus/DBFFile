@@ -5,6 +5,7 @@ For information about the dBase III (.dbf) file format, see:
 - http://www.dbase.com/KnowledgeBase/int/db7_file_fmt.htm
 - http://www.independent-software.com/dbase-dbf-dbt-file-format.html
 - https://docs.microsoft.com/en-us/previous-versions/visualstudio/foxpro/8599s21w(v=vs.80)
+- https://docs.microsoft.com/en-us/previous-versions/visualstudio/foxpro/st4a0s68(v=vs.80)
 
 For test files, see:
 - https://github.com/infused/dbf/tree/master/spec/fixtures

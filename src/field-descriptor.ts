@@ -13,7 +13,7 @@ export interface FieldDescriptor {
      * The single-letter code for the field type.
      * C=string, N=numeric, F=float, I=integer, L=logical, D=date, M=memo.
      */
-    type: 'C' | 'N' | 'F' | 'L' | 'D' | 'I' | 'M';
+    type: 'C' | 'N' | 'F' | 'L' | 'D' | 'I' | 'M' | 'T' | 'B';
 
     /** The size of the field in bytes. */
     size: number;
@@ -35,7 +35,7 @@ export function validateFieldDescriptor(version: FileVersion, field: FieldDescri
 
     // type
     if (typeof type !== 'string' || type.length !== 1) throw new Error('Type must be a single character');
-    if (['C', 'N', 'F', 'L', 'D', 'I', 'M'].indexOf(type) === -1) throw new Error(`Type '${type}' is not supported`);
+    if (['C', 'N', 'F', 'L', 'D', 'I', 'M', 'T', 'B'].indexOf(type) === -1) throw new Error(`Type '${type}' is not supported`);
 
     // size
     if (typeof size !== 'number') throw new Error('Size must be a number');

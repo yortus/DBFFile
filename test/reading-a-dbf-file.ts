@@ -121,6 +121,28 @@ describe('Reading a DBF file', () => {
             },
             deletedCount: 0,
         },
+        {
+            description: 'VFP9 DBF without memo file (version 0x30)',
+            filename: 'vfp9_30.dbf',
+            recordCount: 3,
+            firstRecord: {
+                FIELD1: 'carlos manuel',
+                FIELD2: new Date('2013-12-12'),
+                FIELD3: new Date('2013-12-12 08:30:00 GMT'),
+                FIELD4: 17000000000,
+                FIELD5: 2500.55,
+                FIELD6: true,
+            },
+            lastRecord: {
+                FIELD1: 'ricardo enrique',
+                FIELD2: new Date('2017-08-07'),
+                FIELD3: new Date('2017-08-07 20:30:00 GMT'),
+                FIELD4: 17000000000,
+                FIELD5: 2500.45,
+                FIELD6: true,
+            },
+            deletedCount: 1,
+        },
     ];
 
     tests.forEach(test => {
@@ -135,10 +157,18 @@ describe('Reading a DBF file', () => {
             try {
                 let dbf = await DBFFile.open(filepath, options);
                 let records = await dbf.readRecords();
-                expect(dbf.recordCount).equals(expectedRecordCount);
-                expect(records[0]).to.deep.include(expectedFirstRecord!);
-                expect(records[records.length - 1]).to.deep.include(expectedLastRecord!);
-                expect(dbf.recordCount - records.length).equals(expectedDeletedCount);
+
+                expect(dbf.recordCount, 'the record cound should match')
+                    .equals(expectedRecordCount);
+
+                expect(records[0], 'first record should match')
+                    .to.deep.include(expectedFirstRecord!);
+
+                expect(records[records.length - 1], 'last record should match')
+                    .to.deep.include(expectedLastRecord!);
+
+                expect(dbf.recordCount - records.length, 'deleted records should match')
+                    .equals(expectedDeletedCount);
             }
             catch (err) {
                 expect(err.message).equals(expectedError);
