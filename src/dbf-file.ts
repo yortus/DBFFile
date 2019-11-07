@@ -4,7 +4,7 @@ import { extname } from 'path';
 import { FieldDescriptor, validateFieldDescriptor } from './field-descriptor';
 import { FileVersion, isValidFileVersion } from './file-version';
 import { Encoding, normaliseOptions, Options } from './options';
-import { close, formatDate, open, parseDate, parseDateTime, read, stat, write } from './utils';
+import { close, formatDate, getDateFromJulianInt, getJulianDateTimeFromDate, open, parseDate, read, stat, write } from './utils';
 
 
 
@@ -292,9 +292,9 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                                 break;
                             }
 
-                            const dateInt = buffer.readInt32LE(offset);
+                            const julianDateInt = buffer.readInt32LE(offset);
                             const timeInt = buffer.readInt32LE(offset + 4) + 1;
-                            value = parseDateTime(dateInt, timeInt);
+                            value = getDateFromJulianInt(julianDateInt, timeInt);
                             offset += 8;
                             break;
 
@@ -446,10 +446,24 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
                         buffer.writeUInt8(value ? 0x54/* 'T' */ : 0x46/* 'F' */, offset++);
                         break;
 
+                    case 'T': // DateTime
+                        const julianDate = getJulianDateTimeFromDate(value)[0];
+                        const time = getJulianDateTimeFromDate(value)[1];
+
+                        buffer.writeInt32LE(julianDate, offset);
+                        buffer.writeInt32LE(time, offset + 4);
+                        offset += 8;
+                        break;
+
                     case 'D': // Date
                         value = value ? formatDate(value) : '        ';
                         iconv.encode(value, encoding).copy(buffer, offset, 0, 8);
                         offset += 8;
+                        break;
+
+                    case 'B': // Double
+                        buffer.writeDoubleLE(value, offset);
+                        offset += field.size;
                         break;
 
                     case 'I': // Integer

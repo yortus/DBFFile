@@ -80,6 +80,22 @@ describe('Writing a DBF file', () => {
             firstRecord: {},
             error: 'Writing to files with memo fields is not supported.',
         },
+        {
+            description: `VFP DBF with an 'T' (DateTime) field`,
+            filename: 'vfp9_30.dbf',
+            recordCount: 2,
+            newFields: [],
+            newRecord: record => record,
+            firstRecord: {
+                FIELD1: 'carlos manuel',
+                FIELD2: new Date('2013-12-12'),
+                FIELD3: new Date('2013-12-12 08:30:00 GMT'),
+                FIELD4: 17000000000,
+                FIELD5: 2500.55,
+                FIELD6: true,
+            },
+
+        },
     ];
 
     rimraf.sync(path.join(__dirname, `./fixtures/*.out`));
@@ -98,8 +114,12 @@ describe('Writing a DBF file', () => {
                 await dstDbf.appendRecords(records.map(test.newRecord));
                 dstDbf = await DBFFile.open(dstPath, test.options);
                 records = await dstDbf.readRecords(500);
-                expect(dstDbf.recordCount).equals(expectedRecordCount);
-                expect(records[0]).to.deep.include(expectedFirstRecord!);
+
+                expect(dstDbf.recordCount, 'the record count should match')
+                    .equals(expectedRecordCount);
+
+                expect(records[0], 'first record should match')
+                    .to.deep.include(expectedFirstRecord!);
             }
             catch (err) {
                 expect(err.message).equals(expectedError);

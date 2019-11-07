@@ -158,7 +158,7 @@ describe('Reading a DBF file', () => {
                 let dbf = await DBFFile.open(filepath, options);
                 let records = await dbf.readRecords();
 
-                expect(dbf.recordCount, 'the record cound should match')
+                expect(dbf.recordCount, 'the record count should match')
                     .equals(expectedRecordCount);
 
                 expect(records[0], 'first record should match')
