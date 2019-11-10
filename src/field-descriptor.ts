@@ -11,7 +11,7 @@ export interface FieldDescriptor {
 
     /**
      * The single-letter code for the field type.
-     * C=string, N=numeric, F=float, L=logical, D=date, I=integer, M=memo, T=datetime, D=double.
+     * C=string, N=numeric, F=float, L=logical, D=date, I=integer, M=memo, T=datetime, B=double.
      */
     type: 'C' | 'N' | 'F' | 'L' | 'D' | 'I' | 'M' | 'T' | 'B';
 

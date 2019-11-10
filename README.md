@@ -2,7 +2,7 @@
 
 ### Summary
 
-Read and write .dbf (dBase III) files in Node.js:
+Read and write .dbf (dBase III and Visual FoxPro) files in Node.js:
 
 - Supported field types:
   - `C` (string)
@@ -11,6 +11,8 @@ Read and write .dbf (dBase III) files in Node.js:
   - `I` (integer)
   - `L` (logical)
   - `D` (date)
+  - `T` (datetime)
+  - `B` (double)
   - `M` (memo) Note: memo support is experimental/partial, with the following limitations:
     - read-only (can't create/write DBF files with memo fields)
     - dBase III (version 0x83) and dBase IV (version 0x8b) `.dbt` memo files only
@@ -112,7 +114,7 @@ export interface FieldDescriptor {
      * The single-letter code for the field type.
      * C=string, N=numeric, F=float, I=integer, L=logical, D=date, M=memo.
      */
-    type: 'C' | 'N' | 'F' | 'L' | 'D' | 'I' | 'M';
+    type: 'C' | 'N' | 'F' | 'L' | 'D' | 'I' | 'M' | 'T' | 'B';
 
     /** The size of the field in bytes. */
     size: number;
