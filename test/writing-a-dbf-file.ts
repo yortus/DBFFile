@@ -114,12 +114,8 @@ describe('Writing a DBF file', () => {
                 await dstDbf.appendRecords(records.map(test.newRecord));
                 dstDbf = await DBFFile.open(dstPath, test.options);
                 records = await dstDbf.readRecords(500);
-
-                expect(dstDbf.recordCount, 'the record count should match')
-                    .equals(expectedRecordCount);
-
-                expect(records[0], 'first record should match')
-                    .to.deep.include(expectedFirstRecord!);
+                expect(dstDbf.recordCount, 'the record count should match').equals(expectedRecordCount);
+                expect(records[0], 'first record should match').to.deep.include(expectedFirstRecord!);
             }
             catch (err) {
                 expect(err.message).equals(expectedError);

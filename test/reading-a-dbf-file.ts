@@ -157,18 +157,10 @@ describe('Reading a DBF file', () => {
             try {
                 let dbf = await DBFFile.open(filepath, options);
                 let records = await dbf.readRecords();
-
-                expect(dbf.recordCount, 'the record count should match')
-                    .equals(expectedRecordCount);
-
-                expect(records[0], 'first record should match')
-                    .to.deep.include(expectedFirstRecord!);
-
-                expect(records[records.length - 1], 'last record should match')
-                    .to.deep.include(expectedLastRecord!);
-
-                expect(dbf.recordCount - records.length, 'deleted records should match')
-                    .equals(expectedDeletedCount);
+                expect(dbf.recordCount, 'the record count should match').equals(expectedRecordCount);
+                expect(records[0], 'first record should match').to.deep.include(expectedFirstRecord!);
+                expect(records[records.length - 1], 'last record should match').to.deep.include(expectedLastRecord!);
+                expect(dbf.recordCount - records.length, 'deleted records should match').equals(expectedDeletedCount);
             }
             catch (err) {
                 expect(err.message).equals(expectedError);

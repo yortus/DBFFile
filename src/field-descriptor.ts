@@ -11,7 +11,7 @@ export interface FieldDescriptor {
 
     /**
      * The single-letter code for the field type.
-     * C=string, N=numeric, F=float, I=integer, L=logical, D=date, M=memo.
+     * C=string, N=numeric, F=float, L=logical, D=date, I=integer, M=memo, T=datetime, D=double.
      */
     type: 'C' | 'N' | 'F' | 'L' | 'D' | 'I' | 'M' | 'T' | 'B';
 
@@ -35,7 +35,7 @@ export function validateFieldDescriptor(version: FileVersion, field: FieldDescri
 
     // type
     if (typeof type !== 'string' || type.length !== 1) throw new Error('Type must be a single character');
-    if (['C', 'N', 'F', 'L', 'D', 'I', 'M', 'T', 'B'].indexOf(type) === -1) throw new Error(`Type '${type}' is not supported`);
+    if (FieldTypes.indexOf(type) === -1) throw new Error(`Type '${type}' is not supported`);
 
     // size
     if (typeof size !== 'number') throw new Error('Size must be a number');
@@ -46,9 +46,16 @@ export function validateFieldDescriptor(version: FileVersion, field: FieldDescri
     if (type === 'L' && size !== 1) throw new Error('Invalid field size (must be 1)');
     if (type === 'D' && size !== 8) throw new Error('Invalid field size (must be 8)');
     if (type === 'M' && size !== 10) throw new Error('Invalid field size (must be 10)');
+    if (type === 'T' && size !== 8) throw new Error('Invalid field size (must be 8)');
+    if (type === 'B' && size !== 8) throw new Error('Invalid field size (must be 8)');
 
     // decimalPlaces
     const maxDecimals = version === 0x8b ? 18 : 15;
     if (decs !== undefined && typeof decs !== 'number') throw new Error('decimalPlaces must be undefined or a number');
     if (decs && decs > maxDecimals) throw new Error('Decimal count is too large (maximum is 15)');
 }
+
+
+
+
+const FieldTypes: Array<FieldDescriptor['type']> = ['C', 'N', 'F', 'L', 'D', 'I', 'M', 'T', 'B'];
