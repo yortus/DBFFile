@@ -218,14 +218,15 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
         let buffer = Buffer.alloc(recordLength * recordCountPerBuffer);
 
         // If there is a memo file, open it and get the block size. Also get the total file size for overflow checking.
-        // The code below assumes the block size is at offset 4 in the .dbt, and defaults to 512 if all zeros.
+        // The code below assumes the block size is at offset 4 in the .dbt for dBase IV files, and defaults to 512 if
+        // all zeros. For dBase III files, the block size is always 512 bytes.
         let memoBlockSize = 0;
         let memoFileSize = 0;
         let memoBuf!: Buffer;
         if (dbf._memoPath) {
             memoFd = await open(dbf._memoPath, 'r');
             await read(memoFd, buffer, 0, 4, 4);
-            memoBlockSize = buffer.readInt32LE(0) || 512;
+            memoBlockSize = (dbf._version === 0x8b ? buffer.readInt32LE(0) : 0) || 512;
             memoBuf = Buffer.alloc(memoBlockSize);
             memoFileSize = (await stat(dbf._memoPath)).size;
         }
@@ -340,11 +341,11 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                                     if (eos !== -1) break; // break out of the loop once we've found the terminator.
                                 }
 
-                                // Handle first/next block of dBase III memo data.
+                                // Handle first/next block of dBase IV memo data.
                                 else if (dbf._version === 0x8b) {
                                     // dBase IV memos start with FF-FF-08-00, then a four-byte memo length, which
-                                    // includes eight-byte memo 'header' in the length. The memo length can be larger
-                                    // than a block, so we loop over blocks until done.
+                                    // includes the eight-byte memo 'header' in the length. The memo length can be
+                                    // larger than a block, so we loop over blocks until done.
 
                                     // If this is the first block of the memo, then read the field length.
                                     // Otherwise, we must have already read the length in a previous loop iteration.
