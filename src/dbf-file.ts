@@ -332,11 +332,18 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
 
                                 // Handle first/next block of dBase III memo data.
                                 if (dbf._version === 0x83) {
-                                    // dBase III memos don't have a length header - they are terminated with 0x1A1A.
+                                    // dBase III memos don't have a length header, rather they are terminated with two
+                                    // 0x1A bytes. However when FoxPro is used to modify a dBase III file, it writes
+                                    // only a single 0x1A byte to mark the end of a memo. Some files therefore have both
+                                    // markers (ie 0x1A1A and 0x1A) present in the same file for different records. This
+                                    // reader therefore only looks for a single 0x1A byte to mark the end of the memo,
+                                    // so that it picks up both dBase III and FoxPro variations. (Previously this code
+                                    // only checked for 0x1A1A in 0x83 files, and read past the end of the memo file
+                                    // for some user-submitted test files because it missed single 0x1A markers).
                                     // If the terminator is not found in the current block-sized buffer, then the memo
                                     // value must be larger than a single block size. In that case, we continue the loop
                                     // and read the next block-sized chunk, and so on until the terminator is found.
-                                    let eos = memoBuf.indexOf('\x1A\x1A');
+                                    let eos = memoBuf.indexOf('\x1A');
                                     value += iconv.decode(memoBuf.slice(0, eos === -1 ? memoBlockSize : eos), encoding);
                                     if (eos !== -1) break; // break out of the loop once we've found the terminator.
                                 }
