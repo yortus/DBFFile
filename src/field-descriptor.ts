@@ -11,9 +11,9 @@ export interface FieldDescriptor {
 
     /**
      * The single-letter code for the field type.
-     * C=string, N=numeric, F=float, L=logical, D=date, I=integer, M=memo, T=datetime, B=double.
+     * C=string, N=numeric, F=float, L=logical, D=date, I=integer, M=memo, T=datetime, B=double, Y=currency, 0=null-flags.
      */
-    type: 'C' | 'N' | 'F' | 'L' | 'D' | 'I' | 'M' | 'T' | 'B';
+    type: 'C' | 'N' | 'F' | 'L' | 'D' | 'I' | 'M' | 'T' | 'B' | 'Y' | '0';
 
     /** The size of the field in bytes. */
     size: number;
@@ -48,6 +48,8 @@ export function validateFieldDescriptor(version: FileVersion, field: FieldDescri
     if (type === 'M' && size !== 10) throw new Error('Invalid field size (must be 10)');
     if (type === 'T' && size !== 8) throw new Error('Invalid field size (must be 8)');
     if (type === 'B' && size !== 8) throw new Error('Invalid field size (must be 8)');
+    if (type === 'Y' && size !== 8) throw new Error('Invalid field size (must be 8)');
+    if (type === '0' && size !== 1) throw new Error('Invalid field size (must be 1)');
 
     // decimalPlaces
     const maxDecimals = version === 0x8b ? 18 : 15;
@@ -58,4 +60,4 @@ export function validateFieldDescriptor(version: FileVersion, field: FieldDescri
 
 
 
-const FieldTypes: Array<FieldDescriptor['type']> = ['C', 'N', 'F', 'L', 'D', 'I', 'M', 'T', 'B'];
+const FieldTypes: Array<FieldDescriptor['type']> = ['C', 'N', 'F', 'L', 'D', 'I', 'M', 'T', 'B', 'Y', '0'];

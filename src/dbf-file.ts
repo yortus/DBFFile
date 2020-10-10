@@ -376,6 +376,19 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             }
                             break;
 
+                        case 'Y': // currency
+                            const low = buffer.readInt32LE(offset + 4);
+                            value = buffer.readInt32LE(offset) + 4294967296.0 * low;
+                            if (low < 0) value += 4294967296;
+                            value = value / Math.pow(10.0, field.decimalPlaces || 0);
+                            offset += field.size;
+                            break;
+
+                        case '0': // null-flags
+                            value = null;
+                            offset += field.size;
+                            break;
+
                         default:
                             throw new Error(`Type '${field.type}' is not supported`);
                     }
