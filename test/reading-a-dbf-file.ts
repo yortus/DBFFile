@@ -143,6 +143,38 @@ describe('Reading a DBF file', () => {
             },
             deletedCount: 1,
         },
+        {
+            description: 'VFP9 DBF with AutoIncrement without memo file (version 0x31)',
+            filename: 'vfp9_31.dbf',
+            recordCount: 77,
+            firstRecord: {
+                PRODUCTID: 1,
+                PRODUCTNAM: 'Chai',
+                SUPPLIERID: 1,
+                CATEGORYID: 1,
+                QUANTITYPE: '10 boxes x 20 bags',
+                UNITPRICE: 18,
+                UNITSINSTO: 39,
+                UNITSONORD: 0,
+                REORDERLEV: 10,
+                DISCONTINU: false,
+                _NullFlags: null
+            },
+            lastRecord: {
+                PRODUCTID: 77,
+                PRODUCTNAM: 'Original Frankfurter grüne Soáe',
+                SUPPLIERID: 12,
+                CATEGORYID: 2,
+                QUANTITYPE: '12 boxes',
+                UNITPRICE: 13,
+                UNITSINSTO: 32,
+                UNITSONORD: 0,
+                REORDERLEV: 15,
+                DISCONTINU: false,
+                _NullFlags: null
+            },
+            deletedCount: 0,
+        },
     ];
 
     tests.forEach(test => {
