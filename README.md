@@ -16,6 +16,8 @@ Read and write .dbf (dBase III and Visual FoxPro) files in Node.js:
   - `M` (memo) Note: memo support is experimental/partial, with the following limitations:
     - read-only (can't create/write DBF files with memo fields)
     - dBase III (version 0x83) and dBase IV (version 0x8b) `.dbt` memo files only
+  - `Y` (currency)
+  - `0` (null-flag)
 - Can open an existing .dbf file
   - Can access all field descriptors
   - Can access total record count
@@ -112,9 +114,9 @@ export interface FieldDescriptor {
 
     /**
      * The single-letter code for the field type.
-     * C=string, N=numeric, F=float, I=integer, L=logical, D=date, M=memo.
+     * C=string, N=numeric, F=float, L=logical, D=date, I=integer, M=memo, T=datetime, B=double, Y=currency, 0=null-flags.
      */
-    type: 'C' | 'N' | 'F' | 'L' | 'D' | 'I' | 'M' | 'T' | 'B';
+    type: 'C' | 'N' | 'F' | 'L' | 'D' | 'I' | 'M' | 'T' | 'B' | 'Y' | '0';
 
     /** The size of the field in bytes. */
     size: number;
