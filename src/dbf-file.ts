@@ -377,9 +377,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             break;
 
                         case 'Y': // currency
-                            const low = buffer.readInt32LE(offset + 4);
-                            value = buffer.readInt32LE(offset) + 4294967296.0 * low;
-                            if (low < 0) value += 4294967296;
+                            value = (buffer.readInt32LE(offset + 4) << 8) + buffer.readInt32LE(offset);
                             value = value / Math.pow(10.0, field.decimalPlaces || 0);
                             offset += field.size;
                             break;
@@ -495,6 +493,19 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
                         // TODO: Lift this restriction when memo support is fully implemented.
                         throw new Error(`Writing to files with memo fields is not supported.`);
 
+                    case 'Y': // currency
+                        value = value * Math.pow(10.0, field.decimalPlaces || 0);
+                        buffer.writeUInt32LE(value >> 8, offset + 4);
+                        buffer.writeUInt32LE(value & 0x00ff, offset);
+                        offset += field.size;
+                        break;
+
+                    case '0': // null-flag
+                        // TODO: Lift this restriction when null-flags are implemented.
+                        // throw new Error(`Writing null-flags is currently not supported.`);
+                        value = 0x0;
+                        offset += field.size;
+                        break;
                     default:
                         throw new Error(`Type '${field.type}' is not supported`);
                 }
@@ -547,7 +558,7 @@ function validateRecord(fields: FieldDescriptor[], record: Record<string, unknow
             if (typeof value !== 'string') throw new Error('Expected a string');
             if (value.length > 255) throw new Error('Text is too long (maximum length is 255 chars)');
         }
-        else if (type === 'N' || type === 'F' || type === 'I') {
+        else if (type === 'N' || type === 'F' || type === 'I' || type === 'Y') {
             if (typeof value !== 'number') throw new Error('Expected a number');
         }
         else if (type === 'D') {
