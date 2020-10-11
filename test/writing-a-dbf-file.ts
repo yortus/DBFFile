@@ -94,7 +94,26 @@ describe('Writing a DBF file', () => {
                 FIELD5: 2500.55,
                 FIELD6: true,
             },
-
+        },
+        {
+            description: `VFP DBF with an 'Y' (Currency) field`,
+            filename: 'vfp9_31.dbf',
+            recordCount: 77,
+            newFields: [],
+            newRecord: record => record,
+            firstRecord: {
+                PRODUCTID: 1,
+                PRODUCTNAM: 'Chai',
+                SUPPLIERID: 1,
+                CATEGORYID: 1,
+                QUANTITYPE: '10 boxes x 20 bags',
+                UNITPRICE: 18,
+                UNITSINSTO: 39,
+                UNITSONORD: 0,
+                REORDERLEV: 10,
+                DISCONTINU: false,
+                _NullFlags: null
+            },
         },
     ];
 
