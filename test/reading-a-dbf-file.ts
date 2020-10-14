@@ -50,7 +50,7 @@ describe('Reading a DBF file', () => {
         },
         {
             description: 'DBF stored with non-default encoding, read using default encoding',
-            filename: 'WSPMST.dbf',
+            filename: 'WSPMST.DBF',
             recordCount: 6802,
             firstRecord: { DISPNAME: 'ÃÍ§à·éÒºØÃØÉADDA 61S02-M1', GROUP: '5', LEVEL: 'N' },
             lastRecord: { DISPNAME: '', GROUP: 'W', LEVEL: 'S' },
@@ -58,7 +58,7 @@ describe('Reading a DBF file', () => {
         },
         {
             description: 'DBF stored with non-default encoding, read using correct encoding',
-            filename: 'WSPMST.dbf',
+            filename: 'WSPMST.DBF',
             options: {encoding: 'tis620'},
             recordCount: 6802,
             firstRecord: { DISPNAME: 'รองเท้าบุรุษADDA 61S02-M1', PNAME: 'รองเท้า CASUAL', GROUP: '5', LEVEL: 'N' },
@@ -67,7 +67,7 @@ describe('Reading a DBF file', () => {
         },
         {
             description: 'DBF read with multiple field-specific encodings',
-            filename: 'WSPMST.dbf',
+            filename: 'WSPMST.DBF',
             options: { encoding: { default: 'tis620', PNAME: 'latin1' } },
             recordCount: 6802,
             firstRecord: { DISPNAME: 'รองเท้าบุรุษADDA 61S02-M1', PNAME: 'ÃÍ§à·éÒ CASUAL' },

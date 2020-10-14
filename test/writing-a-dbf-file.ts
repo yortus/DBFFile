@@ -46,7 +46,7 @@ describe('Writing a DBF file', () => {
         },
         {
             description: 'DBF with non-default encoding',
-            filename: 'WSPMST.dbf',
+            filename: 'WSPMST.DBF',
             options: { encoding: 'tis620' },
             recordCount: 100,
             newFields: [{ name: 'FIELD1', type: 'C', size: 20 }],
