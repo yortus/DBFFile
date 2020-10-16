@@ -504,6 +504,7 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
 
                     default:
                         if (dbf._allowUnkownFields) {
+                            console.log(`Type '${field.type}' is not supported. It will be filled with spaces (ignored by options)`);
                             // fill with spaces
                             for (let k = 0; k < field.size; ++k) {
                                 buffer.writeUInt8(0x20, offset++);
