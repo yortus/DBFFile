@@ -82,10 +82,10 @@ The module exports the `DBFFile` class, which has the following shape:
 class DBFFile {
 
     /** Opens an existing DBF file. */
-    static open(path: string, options?: Options): Promise<DBFFile>;
+    static async open(path: string, options?: Partial<Options>);
 
     /** Creates a new DBF file with no records. */
-    static create(path: string, fields: FieldDescriptor[], options?: Options): Promise<DBFFile>;
+    static async create(path: string, fields: FieldDescriptor[], options?: Partial<Options>);
 
     /** Full path to the DBF file. */
     path: string;
@@ -123,11 +123,26 @@ export interface FieldDescriptor {
     decimalPlaces?: number;
 }
 
+/**
+ * Character encoding. Either a string, which applies to all fields, or an object whose keys are field names and
+ * whose values are encodings. If given as an object, field keys are all optional, but a 'default' key is required.
+ * Valid encodings may be found here: https://github.com/ashtuchkin/iconv-lite/wiki/Supported-Encodings
+ */
+type Encoding = string | {default: string, [fieldName: string]: string};
 
 /** Options that may be passed to `DBFFile.open` and `DBFFile.create`. */
 interface Options {
 
-    /** The character encoding(s) to use when reading/writing the DBF file. */
-    encoding?: string | {default: string, [fieldName: string]: string};
+    /** The file version to open or create. Currently versions 0x03, 0x83 and 0x8b are supported. */
+    fileVersion?: FileVersion;
+
+    /** The character encoding(s) to use when reading/writing the DBF file. Defaults to ISO-8859-1. */
+    encoding: Encoding;
+
+    /** Do not fail if trying to parse or write a version that is not officially supported. (This may still fail on other things)  */
+    allowUnkownVersion?: boolean;
+
+    /** Do not fail if trying to parse or write un-supported field types. */
+    allowUnkownFields?: boolean;
 }
 ```

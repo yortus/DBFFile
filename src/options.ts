@@ -13,10 +13,10 @@ export interface Options {
     /** The character encoding(s) to use when reading/writing the DBF file. Defaults to ISO-8859-1. */
     encoding: Encoding;
 
-    /** Do not fail if trying to parse a version that is not officially supported. (This may still fail on other things)  */
+    /** Do not fail if trying to parse or write a version that is not officially supported. (This may still fail on other things)  */
     allowUnkownVersion?: boolean;
 
-    /** Do not fail if trying to parse un-supported field types. */
+    /** Do not fail if trying to parse or write un-supported field types. */
     allowUnkownFields?: boolean;
 }
 
