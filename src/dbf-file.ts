@@ -49,6 +49,8 @@ export class DBFFile {
     _recordLength = 0;
     _memoPath? = '';
     _version? = 0;
+    _allowUnkownFields = false;
+    _allowUnkownVersion = false;
 }
 
 
@@ -64,19 +66,26 @@ async function openDBF(path: string, options: Options): Promise<DBFFile> {
 
         // Read various properties from the header record.
         await read(fd, buffer, 0, 32, 0);
-        let fileVersion = buffer.readUInt8(0);
+        let fileVersion = buffer.readUInt8(0) as FileVersion;
         let recordCount = buffer.readInt32LE(4);
         let headerLength = buffer.readInt16LE(8);
         let recordLength = buffer.readInt16LE(10);
         let memoPath: string | undefined;
 
-        // Validate the file version. Also locate the memo file, if any.
+        // Validate the file version.
         if (!isValidFileVersion(fileVersion)) {
-            throw new Error(`File '${path}' has unknown/unsupported dBase version: ${fileVersion}.`);
+            if (options.allowUnkownVersion) {
+                console.log(`File '${path}' has unknown/unsupported dBase version: ${fileVersion}. (ignored by options)`);
+            } else {
+                throw new Error(`File '${path}' has unknown/unsupported dBase version: ${fileVersion}.`);
+            }
         }
-        else if (fileVersion === 0x83 || fileVersion === 0x8b) {
+
+        // Locate the memo file, if any.
+        if (fileVersion === 0x83 || fileVersion === 0x8b) {
             memoPath = path.slice(0, -extname(path).length) + '.dbt';
         }
+
         if (options.fileVersion && fileVersion !== options.fileVersion) {
             throw new Error(`File '${path}: expected version ${options.fileVersion} but found ${fileVersion}`);
         }
@@ -92,7 +101,7 @@ async function openDBF(path: string, options: Options): Promise<DBFFile> {
                 size: buffer.readUInt8(0x10),
                 decimalPlaces: buffer.readUInt8(0x11)
             };
-            validateFieldDescriptor(fileVersion, field);
+            validateFieldDescriptor(fileVersion, field, options);
             assert(fields.every(f => f.name !== field.name), `Duplicate field name: '${field.name}'`);
             fields.push(field);
         }
@@ -115,6 +124,8 @@ async function openDBF(path: string, options: Options): Promise<DBFFile> {
         result._recordLength = recordLength;
         result._memoPath = memoPath;
         result._version = fileVersion;
+        result._allowUnkownFields = options.allowUnkownFields || false;
+        result._allowUnkownVersion = options.allowUnkownVersion || false;
         return result;
     }
     finally {
@@ -131,7 +142,7 @@ async function createDBF(path: string, fields: FieldDescriptor[], options: Optio
     try {
         // Validate the field metadata.
         let fileVersion = options.fileVersion || 0x03;
-        validateFieldDescriptors(fileVersion, fields);
+        validateFieldDescriptors(fileVersion, fields, options);
 
         // Disallow creation of DBF files with memo fields.
         // TODO: Lift this restriction when memo support is fully implemented.
@@ -195,6 +206,8 @@ async function createDBF(path: string, fields: FieldDescriptor[], options: Optio
         result._recordsRead = 0;
         result._headerLength = headerLength;
         result._recordLength = recordLength;
+        result._allowUnkownFields = options.allowUnkownFields || false;
+        result._allowUnkownVersion = options.allowUnkownVersion || false;
         return result;
     }
     finally {
@@ -377,7 +390,14 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             break;
 
                         default:
-                            throw new Error(`Type '${field.type}' is not supported`);
+                            if (dbf._allowUnkownFields) {
+                                console.log(`Type '${field.type}' is not supported. (ignorged by options)`);
+                                value = null;
+                                offset += field.size;
+                            } else {
+                                throw new Error(`Type '${field.type}' is not supported`);
+                            }
+                            break;
                     }
                     record[field.name] = value;
                 }
@@ -483,7 +503,15 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
                         throw new Error(`Writing to files with memo fields is not supported.`);
 
                     default:
-                        throw new Error(`Type '${field.type}' is not supported`);
+                        if (dbf._allowUnkownFields) {
+                            // fill with spaces
+                            for (let k = 0; k < field.size; ++k) {
+                                buffer.writeUInt8(0x20, offset++);
+                            }
+                        } else {
+                            throw new Error(`Type '${field.type}' is not supported`);
+                        }
+                        break;
                 }
             }
             await write(fd, buffer, 0, recordLength, currentPosition);
@@ -512,9 +540,9 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
 
 
 // Private helper function
-function validateFieldDescriptors(version: FileVersion, fields: FieldDescriptor[]): void {
+function validateFieldDescriptors(version: FileVersion, fields: FieldDescriptor[], options: Options): void {
     if (fields.length > 2046) throw new Error('Too many fields (maximum is 2046)');
-    for (let field of fields) validateFieldDescriptor(version, field);
+    for (let field of fields) validateFieldDescriptor(version, field, options);
 }
 
 

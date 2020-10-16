@@ -1,4 +1,5 @@
 import {FileVersion} from './file-version';
+import {Options} from './options';
 
 
 
@@ -25,7 +26,7 @@ export interface FieldDescriptor {
 
 
 
-export function validateFieldDescriptor(version: FileVersion, field: FieldDescriptor): void {
+export function validateFieldDescriptor(version: FileVersion, field: FieldDescriptor, options: Options): void {
     let {name, type, size, decimalPlaces: decs} = field;
 
     // name
@@ -35,7 +36,13 @@ export function validateFieldDescriptor(version: FileVersion, field: FieldDescri
 
     // type
     if (typeof type !== 'string' || type.length !== 1) throw new Error('Type must be a single character');
-    if (FieldTypes.indexOf(type) === -1) throw new Error(`Type '${type}' is not supported`);
+    if (FieldTypes.indexOf(type) === -1) {
+        if (options.allowUnkownFields) {
+            console.log(`Type '${type}' is not supported. (ignored by options)`);
+        } else {
+            throw new Error(`Type '${type}' is not supported.`);
+        }
+    }
 
     // size
     if (typeof size !== 'number') throw new Error('Size must be a number');

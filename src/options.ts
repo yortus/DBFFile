@@ -12,6 +12,12 @@ export interface Options {
 
     /** The character encoding(s) to use when reading/writing the DBF file. Defaults to ISO-8859-1. */
     encoding: Encoding;
+
+    /** Do not fail if trying to parse a version that is not officially supported. (This may still fail on other things)  */
+    allowUnkownVersion?: boolean;
+
+    /** Do not fail if trying to parse un-supported field types. */
+    allowUnkownFields?: boolean;
 }
 
 
@@ -48,7 +54,7 @@ export function normaliseOptions(options?: Partial<Options>): Options {
 
     // Return a new options object.
     return {
-        fileVersion: options.fileVersion,
-        encoding
+        ...options,
+        encoding,
     };
 }
