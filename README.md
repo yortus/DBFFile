@@ -16,6 +16,7 @@ Read and write .dbf (dBase III and Visual FoxPro) files in Node.js:
   - `M` (memo) Note: memo support is experimental/partial, with the following limitations:
     - read-only (can't create/write DBF files with memo fields)
     - dBase III (version 0x83) and dBase IV (version 0x8b) `.dbt` memo files only
+- 'Loose' read mode - tries to read any kind of .dbf file without complaining. Unsupported field types are simply skipped.
 - Can open an existing .dbf file
   - Can access all field descriptors
   - Can access total record count
@@ -73,6 +74,19 @@ async function testWrite() {
 }
 ```
 
+### Loose Read Mode
+
+Not all versions and variants of .dbf file are supported by this library. Normally, when an unsupported file version or
+field type is encountered, an error is reported and reading halts immediately. This has been a problem for users who
+just want to recover data from old .dbf files, and would rather not write a PR or wait for one that adds the missing
+file/field support.
+
+A more forgiving approach to reading .dbf files is now provided by passing the option `{readMode: 'loose'}` to the
+`DBFFile.open(...)` function. In this mode, unrecognised file versions, unsupported field types, and missing memo files
+are all tolerated. Unsupported/missing field types are still present in the `fields` field descriptors, but will be missing in
+the record data returned by the `readRecords(...)` method.
+
+
 ### API
 
 The module exports the `DBFFile` class, which has the following shape:
@@ -82,10 +96,10 @@ The module exports the `DBFFile` class, which has the following shape:
 class DBFFile {
 
     /** Opens an existing DBF file. */
-    static open(path: string, options?: Options): Promise<DBFFile>;
+    static open(path: string, options?: OpenOptions): Promise<DBFFile>;
 
     /** Creates a new DBF file with no records. */
-    static create(path: string, fields: FieldDescriptor[], options?: Options): Promise<DBFFile>;
+    static create(path: string, fields: FieldDescriptor[], options?: CreateOptions): Promise<DBFFile>;
 
     /** Full path to the DBF file. */
     path: string;
@@ -103,9 +117,8 @@ class DBFFile {
     appendRecords(records: object[]): Promise<DBFFile>;
 }
 
-
 /** Metadata describing a single field in a DBF file. */
-export interface FieldDescriptor {
+interface FieldDescriptor {
 
     /** The name of the field. Must be no longer than 10 characters. */
     name: string;
@@ -123,11 +136,37 @@ export interface FieldDescriptor {
     decimalPlaces?: number;
 }
 
+/** Options that may be passed to `DBFFile.open`. */
+interface OpenOptions {
+    /**
+     * The behavior to adopt when unsupported file versions or field types are encountered. The following values are
+     * supported, with the default being 'strict':
+     * - 'strict': when an unsupported file version or field type is encountered, stop reading the file immediately and
+     *   issue a descriptive error.
+     * - 'loose': ignore unrecognised file versions, unsupported field types, and missing memo files and attempt to
+     *   continue reading the file. Any unsupported field types encountered will be present in field descriptors but
+     *   missing from read records.
+     */
+    readMode?: 'strict' | 'loose'
 
-/** Options that may be passed to `DBFFile.open` and `DBFFile.create`. */
-interface Options {
-
-    /** The character encoding(s) to use when reading/writing the DBF file. */
-    encoding?: string | {default: string, [fieldName: string]: string};
+    /** The character encoding(s) to use when reading the DBF file. Defaults to ISO-8859-1. */
+    encoding?: Encoding;
 }
+
+/** Options that may be passed to `DBFFile.create`. */
+interface CreateOptions {
+
+    /** The file version to create. Currently versions 0x03, 0x83, 0x8b and 0x30 are supported. Defaults to 0x03. */
+    fileVersion?: FileVersion;
+
+    /** The character encoding(s) to use when writing the DBF file. Defaults to ISO-8859-1. */
+    encoding?: Encoding;
+}
+
+/**
+ * Character encoding. Either a string, which applies to all fields, or an object whose keys are field names and
+ * whose values are encodings. If given as an object, field keys are all optional, but a 'default' key is required.
+ * Valid encodings may be found here: https://github.com/ashtuchkin/iconv-lite/wiki/Supported-Encodings
+ */
+type Encoding = string | {default: string, [fieldName: string]: string};
 ```

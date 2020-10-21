@@ -1,5 +1,5 @@
 import {expect} from 'chai';
-import {DBFFile, Options} from 'dbffile';
+import {DBFFile, OpenOptions} from 'dbffile';
 import * as path from 'path';
 
 
@@ -16,7 +16,7 @@ describe('Reading a DBF file', () => {
         filename: string;
 
         /** The options to use when opening the DBF file. */
-        options?: Options;
+        options?: OpenOptions;
 
         /** The expected number of records in the file. Leave undefined if `error` is defined. */
         recordCount?: number;
@@ -39,8 +39,8 @@ describe('Reading a DBF file', () => {
             description: 'DBF with default encoding',
             filename: 'PYACFL.DBF',
             recordCount: 45,
-            firstRecord: { AFCLPD: 'W', AFHRPW: 2.92308, AFLVCL: 0.00, AFCRDA: new Date('1999-03-25'), AFPSDS: '' },
-            lastRecord: { AFCLPD: 'W', AFHRPW: 0, AFLVCL: 0.00, AFCRDA: new Date('1991-04-15'), AFPSDS: '' },
+            firstRecord: {AFCLPD: 'W', AFHRPW: 2.92308, AFLVCL: 0.00, AFCRDA: new Date('1999-03-25'), AFPSDS: ''},
+            lastRecord: {AFCLPD: 'W', AFHRPW: 0, AFLVCL: 0.00, AFCRDA: new Date('1991-04-15'), AFPSDS: ''},
             deletedCount: 30,
         },
         {
@@ -52,8 +52,8 @@ describe('Reading a DBF file', () => {
             description: 'DBF stored with non-default encoding, read using default encoding',
             filename: 'WSPMST.DBF',
             recordCount: 6802,
-            firstRecord: { DISPNAME: 'ÃÍ§à·éÒºØÃØÉADDA 61S02-M1', GROUP: '5', LEVEL: 'N' },
-            lastRecord: { DISPNAME: '', GROUP: 'W', LEVEL: 'S' },
+            firstRecord: {DISPNAME: 'ÃÍ§à·éÒºØÃØÉADDA 61S02-M1', GROUP: '5', LEVEL: 'N'},
+            lastRecord: {DISPNAME: '', GROUP: 'W', LEVEL: 'S'},
             deletedCount: 5,
         },
         {
@@ -61,17 +61,17 @@ describe('Reading a DBF file', () => {
             filename: 'WSPMST.DBF',
             options: {encoding: 'tis620'},
             recordCount: 6802,
-            firstRecord: { DISPNAME: 'รองเท้าบุรุษADDA 61S02-M1', PNAME: 'รองเท้า CASUAL', GROUP: '5', LEVEL: 'N' },
-            lastRecord: { DISPNAME: '', PNAME: 'รองเท้า B-GRADE', GROUP: 'W', LEVEL: 'S' },
+            firstRecord: {DISPNAME: 'รองเท้าบุรุษADDA 61S02-M1', PNAME: 'รองเท้า CASUAL', GROUP: '5', LEVEL: 'N'},
+            lastRecord: {DISPNAME: '', PNAME: 'รองเท้า B-GRADE', GROUP: 'W', LEVEL: 'S'},
             deletedCount: 5,
         },
         {
             description: 'DBF read with multiple field-specific encodings',
             filename: 'WSPMST.DBF',
-            options: { encoding: { default: 'tis620', PNAME: 'latin1' } },
+            options: {encoding: {default: 'tis620', PNAME: 'latin1'}},
             recordCount: 6802,
-            firstRecord: { DISPNAME: 'รองเท้าบุรุษADDA 61S02-M1', PNAME: 'ÃÍ§à·éÒ CASUAL' },
-            lastRecord: { DISPNAME: '', PNAME: 'ÃÍ§à·éÒ B-GRADE' },
+            firstRecord: {DISPNAME: 'รองเท้าบุรุษADDA 61S02-M1', PNAME: 'ÃÍ§à·éÒ CASUAL'},
+            lastRecord: {DISPNAME: '', PNAME: 'ÃÍ§à·éÒ B-GRADE'},
             deletedCount: 5,
         },
         {
@@ -143,6 +143,34 @@ describe('Reading a DBF file', () => {
             },
             deletedCount: 1,
         },
+        {
+            description: `DBF with unsupported file version and field types in 'strict' (default) read mode`,
+            filename: 'dbase_31.dbf',
+            error: 'unknown/unsupported dBase version: 49',
+        },
+        {
+            description: `DBF with unsupported file version and field types in 'loose' read mode`,
+            filename: 'dbase_31.dbf',
+            options: {readMode: 'loose'},
+            recordCount: 77,
+            firstRecord: {PRODUCTID: 1, PRODUCTNAM: 'Chai', REORDERLEV: 10, DISCONTINU: false},
+            lastRecord: {PRODUCTID: 77, PRODUCTNAM: 'Original Frankfurter grüne Soáe', REORDERLEV: 15, DISCONTINU: false},
+            deletedCount: 0,
+        },
+        {
+            description: `DBF with missing memo file in 'strict' (default) read mode`,
+            filename: 'dbase_8b_missing_memo.dbf',
+            error: `Memo file not found`,
+        },
+        {
+            description: `DBF with missing memo file in 'loose' read mode`,
+            filename: 'dbase_8b_missing_memo.dbf',
+            options: {readMode: 'loose'},
+            recordCount: 10,
+            firstRecord: {NUMERICAL: 1, LOGICAL: true, FLOAT: 1.23456789012346},
+            lastRecord: {NUMERICAL: 10, DATE: null, LOGICAL: null, FLOAT: 0.1},
+            deletedCount: 0,
+        },
     ];
 
     tests.forEach(test => {
@@ -154,18 +182,21 @@ describe('Reading a DBF file', () => {
             let expectedLastRecord: Record<string, unknown> | undefined = test.lastRecord;
             let expectedDeletedCount = test.deletedCount;
             let expectedError = test.error;
+
+            let dbf: DBFFile;
+            let records: Record<string, unknown>[];
             try {
-                let dbf = await DBFFile.open(filepath, options);
-                let records = await dbf.readRecords();
-                expect(dbf.recordCount, 'the record count should match').equals(expectedRecordCount);
-                expect(records[0], 'first record should match').to.deep.include(expectedFirstRecord!);
-                expect(records[records.length - 1], 'last record should match').to.deep.include(expectedLastRecord!);
-                expect(dbf.recordCount - records.length, 'deleted records should match').equals(expectedDeletedCount);
+                dbf = await DBFFile.open(filepath, options);
+                records = await dbf.readRecords();
             }
             catch (err) {
-                expect(err.message).equals(expectedError);
+                expect(err.message).contains(expectedError ?? '??????');
                 return;
             }
+            expect(dbf.recordCount, 'the record count should match').equals(expectedRecordCount);
+            expect(records[0], 'first record should match').to.deep.include(expectedFirstRecord!);
+            expect(records[records.length - 1], 'last record should match').to.deep.include(expectedLastRecord!);
+            expect(dbf.recordCount - records.length, 'deleted records should match').equals(expectedDeletedCount);
             expect(undefined).equals(expectedError);
         });
     });

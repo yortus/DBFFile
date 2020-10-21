@@ -2,8 +2,8 @@ import * as assert from 'assert';
 import * as iconv from 'iconv-lite';
 import {extname} from 'path';
 import {FieldDescriptor, validateFieldDescriptor} from './field-descriptor';
-import {FileVersion, isValidFileVersion} from './file-version';
-import {Encoding, normaliseOptions, Options} from './options';
+import {isValidFileVersion} from './file-version';
+import {CreateOptions, Encoding, normaliseCreateOptions, normaliseOpenOptions, OpenOptions} from './options';
 import {close, open, read, stat, write} from './utils';
 import {format8CharDate, formatVfpDateTime, parseVfpDateTime, parse8CharDate} from './utils';
 
@@ -14,13 +14,13 @@ import {format8CharDate, formatVfpDateTime, parseVfpDateTime, parse8CharDate} fr
 export class DBFFile {
 
     /** Opens an existing DBF file. */
-    static async open(path: string, options?: Partial<Options>) {
-        return openDBF(path, normaliseOptions(options));
+    static async open(path: string, options?: OpenOptions) {
+        return openDBF(path, options);
     }
 
     /** Creates a new DBF file with no records. */
-    static async create(path: string, fields: FieldDescriptor[], options?: Partial<Options>) {
-        return createDBF(path, fields, normaliseOptions(options));
+    static async create(path: string, fields: FieldDescriptor[], options?: CreateOptions) {
+        return createDBF(path, fields, options);
     }
 
     /** Full path to the DBF file. */
@@ -43,6 +43,7 @@ export class DBFFile {
     }
 
     // Private.
+    _readMode = 'strict' as 'strict' | 'loose';
     _encoding = '' as Encoding;
     _recordsRead = 0;
     _headerLength = 0;
@@ -55,7 +56,8 @@ export class DBFFile {
 
 
 //-------------------- Private implementation starts here --------------------
-async function openDBF(path: string, options: Options): Promise<DBFFile> {
+async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
+    let options = normaliseOpenOptions(opts);
     let fd = 0;
     try {
         // Open the file and create a buffer to read through.
@@ -70,18 +72,22 @@ async function openDBF(path: string, options: Options): Promise<DBFFile> {
         let recordLength = buffer.readInt16LE(10);
         let memoPath: string | undefined;
 
-        // Validate the file version. Also locate the memo file, if any.
-        if (!isValidFileVersion(fileVersion)) {
+        // Validate the file version. Skip validation if reading in 'loose' mode.
+        if (options.readMode !== 'loose' && !isValidFileVersion(fileVersion)) {
             throw new Error(`File '${path}' has unknown/unsupported dBase version: ${fileVersion}.`);
         }
-        else if (fileVersion === 0x83 || fileVersion === 0x8b) {
+
+        // Locate the memo file, if any. Allow missing memo files if reading in 'loose' mode.
+        if (fileVersion === 0x83 || fileVersion === 0x8b) {
             memoPath = path.slice(0, -extname(path).length) + '.dbt';
-        }
-        if (options.fileVersion && fileVersion !== options.fileVersion) {
-            throw new Error(`File '${path}: expected version ${options.fileVersion} but found ${fileVersion}`);
+            let isMemoFileMissing = await stat(memoPath).catch(() => 'missing') === 'missing';
+            if (isMemoFileMissing) memoPath = undefined;
+            if (options.readMode !== 'loose' && isMemoFileMissing) {
+                throw new Error(`Memo file not found for file '${path}'.`);
+            }
         }
 
-        // Parse and validate all field descriptors.
+        // Parse and validate all field descriptors. Skip validation if reading in 'loose' mode.
         let fields: FieldDescriptor[] = [];
         while (headerLength > 32 + fields.length * 32) {
             await read(fd, buffer, 0, 32, 32 + fields.length * 32);
@@ -92,8 +98,10 @@ async function openDBF(path: string, options: Options): Promise<DBFFile> {
                 size: buffer.readUInt8(0x10),
                 decimalPlaces: buffer.readUInt8(0x11)
             };
-            validateFieldDescriptor(fileVersion, field);
-            assert(fields.every(f => f.name !== field.name), `Duplicate field name: '${field.name}'`);
+            if (options.readMode !== 'loose') {
+                validateFieldDescriptor(field, fileVersion);
+                assert(fields.every(f => f.name !== field.name), `Duplicate field name: '${field.name}'`);
+            }
             fields.push(field);
         }
 
@@ -109,6 +117,7 @@ async function openDBF(path: string, options: Options): Promise<DBFFile> {
         result.path = path;
         result.recordCount = recordCount;
         result.fields = fields;
+        result._readMode = options.readMode;
         result._encoding = options.encoding;
         result._recordsRead = 0;
         result._headerLength = headerLength;
@@ -126,12 +135,13 @@ async function openDBF(path: string, options: Options): Promise<DBFFile> {
 
 
 
-async function createDBF(path: string, fields: FieldDescriptor[], options: Options): Promise<DBFFile> {
+async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateOptions): Promise<DBFFile> {
+    let options = normaliseCreateOptions(opts);
     let fd = 0;
     try {
         // Validate the field metadata.
-        let fileVersion = options.fileVersion || 0x03;
-        validateFieldDescriptors(fileVersion, fields);
+        let fileVersion = options.fileVersion;
+        validateFieldDescriptors(fields, fileVersion);
 
         // Disallow creation of DBF files with memo fields.
         // TODO: Lift this restriction when memo support is fully implemented.
@@ -191,6 +201,7 @@ async function createDBF(path: string, fields: FieldDescriptor[], options: Optio
         result.path = path;
         result.recordCount = 0;
         result.fields = fields.map(field => ({...field})); // make new copy of field descriptors
+        result._readMode = 'strict';
         result._encoding = options.encoding;
         result._recordsRead = 0;
         result._headerLength = headerLength;
@@ -222,7 +233,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
         // all zeros. For dBase III files, the block size is always 512 bytes.
         let memoBlockSize = 0;
         let memoFileSize = 0;
-        let memoBuf!: Buffer;
+        let memoBuf: Buffer | undefined;
         if (dbf._memoPath) {
             memoFd = await open(dbf._memoPath, 'r');
             await read(memoFd, buffer, 0, 4, 4);
@@ -320,6 +331,10 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             let blockIndex = parseInt(substr(offset, len, encoding));
                             offset += len;
 
+                            // If the memo file is missing and we get this far, we must be in 'loose' read mode.
+                            // Skip reading the memo value and continue with the next field.
+                            if (!memoBuf) continue;
+
                             // Start with an empty memo value, and concatenate to it until the memo value is fully read.
                             value = '';
 
@@ -377,7 +392,14 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             break;
 
                         default:
-                            throw new Error(`Type '${field.type}' is not supported`);
+                            // Throw an error if reading in 'strict' mode
+                            if (dbf._readMode === 'strict') throw new Error(`Type '${field.type}' is not supported`);
+
+                            // Skip over the field data if reading in 'loose' mode
+                            if (dbf._readMode === 'loose') {
+                                offset += field.size;
+                                continue;
+                            }
                     }
                     record[field.name] = value;
                 }
@@ -512,9 +534,9 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
 
 
 // Private helper function
-function validateFieldDescriptors(version: FileVersion, fields: FieldDescriptor[]): void {
+function validateFieldDescriptors(fields: FieldDescriptor[], fileVersion: number): void {
     if (fields.length > 2046) throw new Error('Too many fields (maximum is 2046)');
-    for (let field of fields) validateFieldDescriptor(version, field);
+    for (let field of fields) validateFieldDescriptor(field, fileVersion);
 }
 
 
