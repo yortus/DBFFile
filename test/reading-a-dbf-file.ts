@@ -143,6 +143,11 @@ describe('Reading a DBF file', () => {
             },
             deletedCount: 1,
         },
+        {
+            description: 'DBF with unsupported version (0x31)',
+            filename: 'dbase_31.dbf',
+            error: 'unknown/unsupported dBase version: 49',
+        },
     ];
 
     tests.forEach(test => {
@@ -163,7 +168,7 @@ describe('Reading a DBF file', () => {
                 expect(dbf.recordCount - records.length, 'deleted records should match').equals(expectedDeletedCount);
             }
             catch (err) {
-                expect(err.message).equals(expectedError);
+                expect(err.message).contains(expectedError || '??????');
                 return;
             }
             expect(undefined).equals(expectedError);
