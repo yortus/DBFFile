@@ -12,8 +12,9 @@ export interface OpenOptions {
      * supported, with the default being 'strict':
      * - 'strict': when an unsupported file version or field type is encountered, stop reading the file immediately and
      *   issue a descriptive error.
-     * - 'loose': ignore unsupported file versions and unsupported field types and attempt to continue reading the file.
-     *   Any unsupported field types encountered will be present in field descriptors but missing from read records.
+     * - 'loose': ignore unrecognised file versions, unsupported field types, and missing memo files and attempt to
+     *   continue reading the file. Any unsupported field types encountered will be present in field descriptors but
+     *   missing from read records.
      */
     readMode?: 'strict' | 'loose'
 
