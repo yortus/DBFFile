@@ -2,8 +2,8 @@ import * as assert from 'assert';
 import * as iconv from 'iconv-lite';
 import {extname} from 'path';
 import {FieldDescriptor, validateFieldDescriptor} from './field-descriptor';
-import {FileVersion, isValidFileVersion} from './file-version';
-import {Encoding, normaliseOptions, Options} from './options';
+import {isValidFileVersion} from './file-version';
+import {CreateOptions, Encoding, normaliseCreateOptions, normaliseOpenOptions, OpenOptions} from './options';
 import {close, open, read, stat, write} from './utils';
 import {format8CharDate, formatVfpDateTime, parseVfpDateTime, parse8CharDate} from './utils';
 
@@ -14,13 +14,13 @@ import {format8CharDate, formatVfpDateTime, parseVfpDateTime, parse8CharDate} fr
 export class DBFFile {
 
     /** Opens an existing DBF file. */
-    static async open(path: string, options?: Partial<Options>) {
-        return openDBF(path, normaliseOptions(options));
+    static async open(path: string, options?: OpenOptions) {
+        return openDBF(path, options);
     }
 
     /** Creates a new DBF file with no records. */
-    static async create(path: string, fields: FieldDescriptor[], options?: Partial<Options>) {
-        return createDBF(path, fields, normaliseOptions(options));
+    static async create(path: string, fields: FieldDescriptor[], options?: CreateOptions) {
+        return createDBF(path, fields, options);
     }
 
     /** Full path to the DBF file. */
@@ -55,7 +55,8 @@ export class DBFFile {
 
 
 //-------------------- Private implementation starts here --------------------
-async function openDBF(path: string, options: Options): Promise<DBFFile> {
+async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
+    let options = normaliseOpenOptions(opts);
     let fd = 0;
     try {
         // Open the file and create a buffer to read through.
@@ -70,15 +71,14 @@ async function openDBF(path: string, options: Options): Promise<DBFFile> {
         let recordLength = buffer.readInt16LE(10);
         let memoPath: string | undefined;
 
-        // Validate the file version. Also locate the memo file, if any.
-        if (!isValidFileVersion(fileVersion)) {
+        // Validate the file version if reading in strict mode.
+        if (options.readMode === 'strict' && !isValidFileVersion(fileVersion)) {
             throw new Error(`File '${path}' has unknown/unsupported dBase version: ${fileVersion}.`);
         }
-        else if (fileVersion === 0x83 || fileVersion === 0x8b) {
+
+        // Locate the memo file, if any.
+        if (fileVersion === 0x83 || fileVersion === 0x8b) {
             memoPath = path.slice(0, -extname(path).length) + '.dbt';
-        }
-        if (options.fileVersion && fileVersion !== options.fileVersion) {
-            throw new Error(`File '${path}: expected version ${options.fileVersion} but found ${fileVersion}`);
         }
 
         // Parse and validate all field descriptors.
@@ -92,7 +92,7 @@ async function openDBF(path: string, options: Options): Promise<DBFFile> {
                 size: buffer.readUInt8(0x10),
                 decimalPlaces: buffer.readUInt8(0x11)
             };
-            validateFieldDescriptor(fileVersion, field);
+            validateFieldDescriptor(field, fileVersion);
             assert(fields.every(f => f.name !== field.name), `Duplicate field name: '${field.name}'`);
             fields.push(field);
         }
@@ -126,12 +126,13 @@ async function openDBF(path: string, options: Options): Promise<DBFFile> {
 
 
 
-async function createDBF(path: string, fields: FieldDescriptor[], options: Options): Promise<DBFFile> {
+async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateOptions): Promise<DBFFile> {
+    let options = normaliseCreateOptions(opts);
     let fd = 0;
     try {
         // Validate the field metadata.
-        let fileVersion = options.fileVersion || 0x03;
-        validateFieldDescriptors(fileVersion, fields);
+        let fileVersion = options.fileVersion;
+        validateFieldDescriptors(fields, fileVersion);
 
         // Disallow creation of DBF files with memo fields.
         // TODO: Lift this restriction when memo support is fully implemented.
@@ -512,9 +513,9 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
 
 
 // Private helper function
-function validateFieldDescriptors(version: FileVersion, fields: FieldDescriptor[]): void {
+function validateFieldDescriptors(fields: FieldDescriptor[], fileVersion: number): void {
     if (fields.length > 2046) throw new Error('Too many fields (maximum is 2046)');
-    for (let field of fields) validateFieldDescriptor(version, field);
+    for (let field of fields) validateFieldDescriptor(field, fileVersion);
 }
 
 

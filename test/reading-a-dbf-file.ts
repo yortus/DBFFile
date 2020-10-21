@@ -1,5 +1,5 @@
 import {expect} from 'chai';
-import {DBFFile, Options} from 'dbffile';
+import {DBFFile, OpenOptions} from 'dbffile';
 import * as path from 'path';
 
 
@@ -16,7 +16,7 @@ describe('Reading a DBF file', () => {
         filename: string;
 
         /** The options to use when opening the DBF file. */
-        options?: Options;
+        options?: OpenOptions;
 
         /** The expected number of records in the file. Leave undefined if `error` is defined. */
         recordCount?: number;
@@ -39,8 +39,8 @@ describe('Reading a DBF file', () => {
             description: 'DBF with default encoding',
             filename: 'PYACFL.DBF',
             recordCount: 45,
-            firstRecord: { AFCLPD: 'W', AFHRPW: 2.92308, AFLVCL: 0.00, AFCRDA: new Date('1999-03-25'), AFPSDS: '' },
-            lastRecord: { AFCLPD: 'W', AFHRPW: 0, AFLVCL: 0.00, AFCRDA: new Date('1991-04-15'), AFPSDS: '' },
+            firstRecord: {AFCLPD: 'W', AFHRPW: 2.92308, AFLVCL: 0.00, AFCRDA: new Date('1999-03-25'), AFPSDS: ''},
+            lastRecord: {AFCLPD: 'W', AFHRPW: 0, AFLVCL: 0.00, AFCRDA: new Date('1991-04-15'), AFPSDS: ''},
             deletedCount: 30,
         },
         {
@@ -52,8 +52,8 @@ describe('Reading a DBF file', () => {
             description: 'DBF stored with non-default encoding, read using default encoding',
             filename: 'WSPMST.DBF',
             recordCount: 6802,
-            firstRecord: { DISPNAME: 'ÃÍ§à·éÒºØÃØÉADDA 61S02-M1', GROUP: '5', LEVEL: 'N' },
-            lastRecord: { DISPNAME: '', GROUP: 'W', LEVEL: 'S' },
+            firstRecord: {DISPNAME: 'ÃÍ§à·éÒºØÃØÉADDA 61S02-M1', GROUP: '5', LEVEL: 'N'},
+            lastRecord: {DISPNAME: '', GROUP: 'W', LEVEL: 'S'},
             deletedCount: 5,
         },
         {
@@ -61,17 +61,17 @@ describe('Reading a DBF file', () => {
             filename: 'WSPMST.DBF',
             options: {encoding: 'tis620'},
             recordCount: 6802,
-            firstRecord: { DISPNAME: 'รองเท้าบุรุษADDA 61S02-M1', PNAME: 'รองเท้า CASUAL', GROUP: '5', LEVEL: 'N' },
-            lastRecord: { DISPNAME: '', PNAME: 'รองเท้า B-GRADE', GROUP: 'W', LEVEL: 'S' },
+            firstRecord: {DISPNAME: 'รองเท้าบุรุษADDA 61S02-M1', PNAME: 'รองเท้า CASUAL', GROUP: '5', LEVEL: 'N'},
+            lastRecord: {DISPNAME: '', PNAME: 'รองเท้า B-GRADE', GROUP: 'W', LEVEL: 'S'},
             deletedCount: 5,
         },
         {
             description: 'DBF read with multiple field-specific encodings',
             filename: 'WSPMST.DBF',
-            options: { encoding: { default: 'tis620', PNAME: 'latin1' } },
+            options: {encoding: {default: 'tis620', PNAME: 'latin1'}},
             recordCount: 6802,
-            firstRecord: { DISPNAME: 'รองเท้าบุรุษADDA 61S02-M1', PNAME: 'ÃÍ§à·éÒ CASUAL' },
-            lastRecord: { DISPNAME: '', PNAME: 'ÃÍ§à·éÒ B-GRADE' },
+            firstRecord: {DISPNAME: 'รองเท้าบุรุษADDA 61S02-M1', PNAME: 'ÃÍ§à·éÒ CASUAL'},
+            lastRecord: {DISPNAME: '', PNAME: 'ÃÍ§à·éÒ B-GRADE'},
             deletedCount: 5,
         },
         {
@@ -144,9 +144,15 @@ describe('Reading a DBF file', () => {
             deletedCount: 1,
         },
         {
-            description: 'DBF with unsupported version (0x31)',
+            description: 'unsupported DBF with default options',
             filename: 'dbase_31.dbf',
             error: 'unknown/unsupported dBase version: 49',
+        },
+        {
+            description: 'unsupported DBF with no file version validation',
+            filename: 'dbase_31.dbf',
+            options: {readMode: 'loose'},
+            error: `Type 'Y' is not supported`,
         },
     ];
 
@@ -168,7 +174,7 @@ describe('Reading a DBF file', () => {
                 expect(dbf.recordCount - records.length, 'deleted records should match').equals(expectedDeletedCount);
             }
             catch (err) {
-                expect(err.message).contains(expectedError || '??????');
+                expect(err.message).contains(expectedError ?? '??????');
                 return;
             }
             expect(undefined).equals(expectedError);
