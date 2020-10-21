@@ -43,6 +43,7 @@ export class DBFFile {
     }
 
     // Private.
+    _readMode = 'strict' as 'strict' | 'loose';
     _encoding = '' as Encoding;
     _recordsRead = 0;
     _headerLength = 0;
@@ -71,17 +72,22 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
         let recordLength = buffer.readInt16LE(10);
         let memoPath: string | undefined;
 
-        // Validate the file version if reading in strict mode.
-        if (options.readMode === 'strict' && !isValidFileVersion(fileVersion)) {
+        // Validate the file version. Skip validation if reading in 'loose' mode.
+        if (options.readMode !== 'loose' && !isValidFileVersion(fileVersion)) {
             throw new Error(`File '${path}' has unknown/unsupported dBase version: ${fileVersion}.`);
         }
 
-        // Locate the memo file, if any.
+        // Locate the memo file, if any. Allow missing memo files if reading in 'loose' mode.
         if (fileVersion === 0x83 || fileVersion === 0x8b) {
             memoPath = path.slice(0, -extname(path).length) + '.dbt';
+            let isMemoFileMissing = await stat(memoPath).catch(() => 'missing') === 'missing';
+            if (isMemoFileMissing) memoPath = undefined;
+            if (options.readMode !== 'loose' && isMemoFileMissing) {
+                throw new Error(`Memo file not found for file '${path}'.`);
+            }
         }
 
-        // Parse and validate all field descriptors.
+        // Parse and validate all field descriptors. Skip validation if reading in 'loose' mode.
         let fields: FieldDescriptor[] = [];
         while (headerLength > 32 + fields.length * 32) {
             await read(fd, buffer, 0, 32, 32 + fields.length * 32);
@@ -92,8 +98,10 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
                 size: buffer.readUInt8(0x10),
                 decimalPlaces: buffer.readUInt8(0x11)
             };
-            validateFieldDescriptor(field, fileVersion);
-            assert(fields.every(f => f.name !== field.name), `Duplicate field name: '${field.name}'`);
+            if (options.readMode !== 'loose') {
+                validateFieldDescriptor(field, fileVersion);
+                assert(fields.every(f => f.name !== field.name), `Duplicate field name: '${field.name}'`);
+            }
             fields.push(field);
         }
 
@@ -109,6 +117,7 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
         result.path = path;
         result.recordCount = recordCount;
         result.fields = fields;
+        result._readMode = options.readMode;
         result._encoding = options.encoding;
         result._recordsRead = 0;
         result._headerLength = headerLength;
@@ -192,6 +201,7 @@ async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateO
         result.path = path;
         result.recordCount = 0;
         result.fields = fields.map(field => ({...field})); // make new copy of field descriptors
+        result._readMode = 'strict';
         result._encoding = options.encoding;
         result._recordsRead = 0;
         result._headerLength = headerLength;
@@ -223,7 +233,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
         // all zeros. For dBase III files, the block size is always 512 bytes.
         let memoBlockSize = 0;
         let memoFileSize = 0;
-        let memoBuf!: Buffer;
+        let memoBuf: Buffer | undefined;
         if (dbf._memoPath) {
             memoFd = await open(dbf._memoPath, 'r');
             await read(memoFd, buffer, 0, 4, 4);
@@ -321,6 +331,10 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             let blockIndex = parseInt(substr(offset, len, encoding));
                             offset += len;
 
+                            // If the memo file is missing and we get this far, we must be in 'loose' read mode.
+                            // Skip reading the memo value and continue with the next field.
+                            if (!memoBuf) continue;
+
                             // Start with an empty memo value, and concatenate to it until the memo value is fully read.
                             value = '';
 
@@ -378,7 +392,14 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             break;
 
                         default:
-                            throw new Error(`Type '${field.type}' is not supported`);
+                            // Throw an error if reading in 'strict' mode
+                            if (dbf._readMode === 'strict') throw new Error(`Type '${field.type}' is not supported`);
+
+                            // Skip over the field data if reading in 'loose' mode
+                            if (dbf._readMode === 'loose') {
+                                offset += field.size;
+                                continue;
+                            }
                     }
                     record[field.name] = value;
                 }

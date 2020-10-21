@@ -1,5 +1,5 @@
 import {expect} from 'chai';
-import {CreateOptions, DBFFile, FieldDescriptor} from 'dbffile';
+import {CreateOptions, DBFFile, FieldDescriptor, OpenOptions} from 'dbffile';
 import * as path from 'path';
 import * as rimraf from 'rimraf'
 
@@ -17,7 +17,7 @@ describe('Writing a DBF file', () => {
         filename: string;
 
         /** The options to use when opening/creating the source/target DBF files. */
-        options?: CreateOptions;
+        options?: OpenOptions & CreateOptions;
 
         /** The expected number of records in the source file. */
         recordCount: number;
@@ -105,6 +105,16 @@ describe('Writing a DBF file', () => {
             firstRecord: {},
             error: 'Invalid file version 49',
         },
+        {
+            description: `DBF with unsupported field type`,
+            filename: 'dbase_31.dbf',
+            options: {readMode: 'loose'},
+            recordCount: 0,
+            newFields: [],
+            newRecord: record => record,
+            firstRecord: {},
+            error: `Type 'Y' is not supported`,
+        },
     ];
 
     rimraf.sync(path.join(__dirname, `./fixtures/*.out`));
@@ -114,22 +124,25 @@ describe('Writing a DBF file', () => {
             let expectedRecordCount = test.recordCount;
             let expectedFirstRecord: Record<string, unknown> | undefined = test.firstRecord;
             let expectedError = test.error;
+
+            let dstDbf: DBFFile;
+            let records: Record<string, unknown>[];
             try {
                 let srcPath = path.join(__dirname, `./fixtures/${test.filename}`);
                 let dstPath = path.join(__dirname, `./fixtures/${test.filename}.out`);
                 let srcDbf = await DBFFile.open(srcPath, test.options);
-                let dstDbf = await DBFFile.create(dstPath, srcDbf.fields.concat(test.newFields), test.options as any);
-                let records = await srcDbf.readRecords(100);
+                dstDbf = await DBFFile.create(dstPath, srcDbf.fields.concat(test.newFields), test.options as any);
+                records = await srcDbf.readRecords(100);
                 await dstDbf.appendRecords(records.map(test.newRecord));
                 dstDbf = await DBFFile.open(dstPath, test.options);
                 records = await dstDbf.readRecords(500);
-                expect(dstDbf.recordCount, 'the record count should match').equals(expectedRecordCount);
-                expect(records[0], 'first record should match').to.deep.include(expectedFirstRecord!);
             }
             catch (err) {
-                expect(err.message).equals(expectedError);
+                expect(err.message).equals(expectedError ?? '??????');
                 return;
             }
+            expect(dstDbf.recordCount, 'the record count should match').equals(expectedRecordCount);
+            expect(records[0], 'first record should match').to.deep.include(expectedFirstRecord!);
             expect(undefined).equals(expectedError);
         });
     });

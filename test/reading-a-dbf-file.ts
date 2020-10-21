@@ -144,15 +144,32 @@ describe('Reading a DBF file', () => {
             deletedCount: 1,
         },
         {
-            description: 'unsupported DBF with default options',
+            description: `DBF with unsupported file version and field types in 'strict' (default) read mode`,
             filename: 'dbase_31.dbf',
             error: 'unknown/unsupported dBase version: 49',
         },
         {
-            description: 'unsupported DBF with no file version validation',
+            description: `DBF with unsupported file version and field types in 'loose' read mode`,
             filename: 'dbase_31.dbf',
             options: {readMode: 'loose'},
-            error: `Type 'Y' is not supported`,
+            recordCount: 77,
+            firstRecord: {PRODUCTID: 1, PRODUCTNAM: 'Chai', REORDERLEV: 10, DISCONTINU: false},
+            lastRecord: {PRODUCTID: 77, PRODUCTNAM: 'Original Frankfurter grüne Soáe', REORDERLEV: 15, DISCONTINU: false},
+            deletedCount: 0,
+        },
+        {
+            description: `DBF with missing memo file in 'strict' (default) read mode`,
+            filename: 'dbase_8b_missing_memo.dbf',
+            error: `Memo file not found`,
+        },
+        {
+            description: `DBF with missing memo file in 'loose' read mode`,
+            filename: 'dbase_8b_missing_memo.dbf',
+            options: {readMode: 'loose'},
+            recordCount: 10,
+            firstRecord: {NUMERICAL: 1, LOGICAL: true, FLOAT: 1.23456789012346},
+            lastRecord: {NUMERICAL: 10, DATE: null, LOGICAL: null, FLOAT: 0.1},
+            deletedCount: 0,
         },
     ];
 
@@ -165,18 +182,21 @@ describe('Reading a DBF file', () => {
             let expectedLastRecord: Record<string, unknown> | undefined = test.lastRecord;
             let expectedDeletedCount = test.deletedCount;
             let expectedError = test.error;
+
+            let dbf: DBFFile;
+            let records: Record<string, unknown>[];
             try {
-                let dbf = await DBFFile.open(filepath, options);
-                let records = await dbf.readRecords();
-                expect(dbf.recordCount, 'the record count should match').equals(expectedRecordCount);
-                expect(records[0], 'first record should match').to.deep.include(expectedFirstRecord!);
-                expect(records[records.length - 1], 'last record should match').to.deep.include(expectedLastRecord!);
-                expect(dbf.recordCount - records.length, 'deleted records should match').equals(expectedDeletedCount);
+                dbf = await DBFFile.open(filepath, options);
+                records = await dbf.readRecords();
             }
             catch (err) {
                 expect(err.message).contains(expectedError ?? '??????');
                 return;
             }
+            expect(dbf.recordCount, 'the record count should match').equals(expectedRecordCount);
+            expect(records[0], 'first record should match').to.deep.include(expectedFirstRecord!);
+            expect(records[records.length - 1], 'last record should match').to.deep.include(expectedLastRecord!);
+            expect(dbf.recordCount - records.length, 'deleted records should match').equals(expectedDeletedCount);
             expect(undefined).equals(expectedError);
         });
     });
