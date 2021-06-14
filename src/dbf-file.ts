@@ -250,6 +250,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
 
         // Read records in chunks, until enough records have been read.
         let records: Array<Record<string, unknown>> = [];
+        let recordNumber : number = 0;
         while (true) {
 
             // Work out how many records to read in this chunk.
@@ -269,6 +270,8 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
             // Parse each record.
             for (let i = 0, offset = 0; i < recordCountToRead; ++i) {
                 let record: Record<string, unknown> = {};
+                record["@recordNumber"] = recordNumber;
+                recordNumber++;
                 let isDeleted = (buffer[offset++] === 0x2a);
                 if (isDeleted) { offset += recordLength - 1; continue; }
 
