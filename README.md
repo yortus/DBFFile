@@ -21,6 +21,7 @@ Read and write .dbf (dBase III and Visual FoxPro) files in Node.js:
   - Can access all field descriptors
   - Can access total record count
   - Can read records in arbitrary-sized batches
+  - Can include deleted records in results
   - Supports very large files
 - Can create a new .dbf file
   - Can use field descriptors from a user-specified object of from another instance
@@ -151,6 +152,12 @@ interface OpenOptions {
 
     /** The character encoding(s) to use when reading the DBF file. Defaults to ISO-8859-1. */
     encoding?: Encoding;
+
+    /**
+     * Indicates whether deleted records should be included in results when reading records. Defaults to false.
+     * Deleted records have the property `[DELETED]: true`, using the `DELETED` symbol exported from this library.
+     */
+    includeDeletedRecords?: boolean;
 }
 
 /** Options that may be passed to `DBFFile.create`. */
