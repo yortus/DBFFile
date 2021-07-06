@@ -553,14 +553,14 @@ function validateRecord(fields: FieldDescriptor[], record: Record<string, unknow
 
         // Perform type-specific checks
         if (type === 'C') {
-            if (typeof value !== 'string') throw new Error('Expected a string');
-            if (value.length > 255) throw new Error('Text is too long (maximum length is 255 chars)');
+            if (typeof value !== 'string') throw new Error(`${name}: expected a string`);
+            if (value.length > 255) throw new Error(`${name}: text is too long (maximum length is 255 chars)`);
         }
         else if (type === 'N' || type === 'F' || type === 'I') {
-            if (typeof value !== 'number') throw new Error('Expected a number');
+            if (typeof value !== 'number') throw new Error(`${name}: expected a number`);
         }
         else if (type === 'D') {
-            if (!(value instanceof Date)) throw new Error('Expected a date');
+            if (!(value instanceof Date)) throw new Error(`${name}: expected a date`);
         }
     }
 }
