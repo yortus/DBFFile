@@ -152,6 +152,15 @@ describe('Writing a DBF file', () => {
             firstRecord: {},
             error: `AFCRDA: expected a date`,
         },
+        {
+            description: `DBF with invalid field value (boolean type mismatch)`,
+            filename: 'vfp9_30.dbf',
+            recordCount: 2,
+            newFields: [],
+            newRecord: record => ({...record, FIELD6: 0}),
+            firstRecord: {},
+            error: `FIELD6: expected a boolean`,
+        },
     ];
 
     rimraf.sync(path.join(__dirname, `./fixtures/*.out`));

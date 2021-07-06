@@ -473,7 +473,7 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
                         break;
 
                     case 'L': // Boolean
-                        buffer.writeUInt8(value ? 0x54/* 'T' */ : 0x46/* 'F' */, offset++);
+                        buffer.writeUInt8(value === '' ? 0x20 : value ? 0x54/* 'T' */ : 0x46/* 'F' */, offset++);
                         break;
 
                     case 'T': // DateTime
@@ -561,6 +561,9 @@ function validateRecord(fields: FieldDescriptor[], record: Record<string, unknow
         }
         else if (type === 'D') {
             if (!(value instanceof Date)) throw new Error(`${name}: expected a date`);
+        }
+        else if (type === 'L') {
+            if (typeof value !== 'boolean') throw new Error(`${name}: expected a boolean`);
         }
     }
 }
