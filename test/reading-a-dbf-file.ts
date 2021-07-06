@@ -1,5 +1,5 @@
 import {expect} from 'chai';
-import {DBFFile, OpenOptions} from 'dbffile';
+import {DBFFile, OpenOptions, DELETED} from 'dbffile';
 import * as path from 'path';
 
 
@@ -22,10 +22,10 @@ describe('Reading a DBF file', () => {
         recordCount?: number;
 
         /** Expected field values in the first record. Leave undefined if `error` is defined. */
-        firstRecord?: Record<string, unknown>;
+        firstRecord?: Record<string, unknown> & {[DELETED]?: true};
 
         /** Expected field values in the last record. Leave undefined if `error` is defined. */
-        lastRecord?: Record<string, unknown>;
+        lastRecord?: Record<string, unknown> & {[DELETED]?: true};
 
         /** Expected count of deleted records in the file. Leave undefined if `error` is defined. */
         deletedCount?: number;
@@ -171,6 +171,15 @@ describe('Reading a DBF file', () => {
             lastRecord: {NUMERICAL: 10, DATE: null, LOGICAL: null, FLOAT: 0.1},
             deletedCount: 0,
         },
+        {
+            description: 'DBF with deleted records included in results',
+            filename: 'PYACFL.DBF',
+            options: {includeDeletedRecords: true},
+            recordCount: 45,
+            firstRecord: {[DELETED]: true, AFCLPD: 'W', AFHRPW: 0, AFACCL: 'P', AFCRDA: new Date('1991-04-15'), AFPSDS: ''},
+            lastRecord: {AFCLPD: 'W', AFHRPW: 0, AFLVCL: 0.00, AFCRDA: new Date('1991-04-15'), AFPSDS: ''},
+            deletedCount: 0,
+        },
     ];
 
     tests.forEach(test => {
@@ -178,13 +187,13 @@ describe('Reading a DBF file', () => {
             let filepath = path.join(__dirname, `./fixtures/${test.filename}`);
             let options = test.options;
             let expectedRecordCount = test.recordCount;
-            let expectedFirstRecord: Record<string, unknown> | undefined = test.firstRecord;
-            let expectedLastRecord: Record<string, unknown> | undefined = test.lastRecord;
+            let expectedFirstRecord = test.firstRecord;
+            let expectedLastRecord = test.lastRecord;
             let expectedDeletedCount = test.deletedCount;
             let expectedError = test.error;
 
             let dbf: DBFFile;
-            let records: Record<string, unknown>[];
+            let records: Array<Record<string, unknown> & {[DELETED]?: true}>;
             try {
                 dbf = await DBFFile.open(filepath, options);
                 records = await dbf.readRecords();
@@ -195,7 +204,9 @@ describe('Reading a DBF file', () => {
             }
             expect(dbf.recordCount, 'the record count should match').equals(expectedRecordCount);
             expect(records[0], 'first record should match').to.deep.include(expectedFirstRecord!);
+            expect(records[0][DELETED], 'first record should match').equals(expectedFirstRecord![DELETED]);
             expect(records[records.length - 1], 'last record should match').to.deep.include(expectedLastRecord!);
+            expect(records[records.length - 1][DELETED], 'last record should match').equals(expectedLastRecord![DELETED]);
             expect(dbf.recordCount - records.length, 'deleted records should match').equals(expectedDeletedCount);
             expect(undefined).equals(expectedError);
         });

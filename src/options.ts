@@ -20,6 +20,9 @@ export interface OpenOptions {
 
     /** The character encoding(s) to use when reading the DBF file. Defaults to ISO-8859-1. */
     encoding?: Encoding;
+
+    /** Indicates whether deleted records should be included in results when reading records. Defaults to false. */
+    includeDeletedRecords?: boolean;
 }
 
 
@@ -61,8 +64,14 @@ export function normaliseOpenOptions(options: OpenOptions | undefined): Required
         throw new Error(`Invalid read mode ${readMode}`);
     }
 
+    // Validate `includeDeletedRecords`.
+    let includeDeletedRecords = options?.includeDeletedRecords ?? false;
+    if (typeof includeDeletedRecords !== 'boolean') {
+        throw new Error(`Invalid value 'includeDeletedRecords' value ${includeDeletedRecords}`);
+    }
+
     // Return a new normalised options object.
-    return {encoding, readMode};
+    return {encoding, readMode, includeDeletedRecords};
 }
 
 

@@ -1,5 +1,6 @@
 import {expect} from 'chai';
 import {CreateOptions, DBFFile, FieldDescriptor, OpenOptions} from 'dbffile';
+import {promises as fs} from 'fs';
 import * as path from 'path';
 import * as rimraf from 'rimraf'
 
@@ -115,6 +116,67 @@ describe('Writing a DBF file', () => {
             firstRecord: {},
             error: `Type 'Y' is not supported`,
         },
+        {
+            description: `DBF with invalid field value (string type mismatch)`,
+            filename: 'PYACFL.DBF',
+            recordCount: 15,
+            newFields: [],
+            newRecord: record => ({...record, AFCLPD: 1234}),
+            firstRecord: {},
+            error: `AFCLPD: expected a string`,
+        },
+        {
+            description: `DBF with invalid field value (string too long)`,
+            filename: 'PYACFL.DBF',
+            recordCount: 15,
+            newFields: [],
+            newRecord: record => ({...record, AFCLPD: 'blah '.repeat(60)}),
+            firstRecord: {},
+            error: `AFCLPD: text is too long (maximum length is 255 chars)`,
+        },
+        {
+            description: `DBF with invalid field value (number type mismatch)`,
+            filename: 'PYACFL.DBF',
+            recordCount: 15,
+            newFields: [],
+            newRecord: record => ({...record, AFHRPW: 'not a number'}),
+            firstRecord: {},
+            error: `AFHRPW: expected a number`,
+        },
+        {
+            description: `DBF with invalid field value (date type mismatch)`,
+            filename: 'PYACFL.DBF',
+            recordCount: 15,
+            newFields: [],
+            newRecord: record => ({...record, AFCRDA: '1999-03-25'}),
+            firstRecord: {},
+            error: `AFCRDA: expected a date`,
+        },
+        {
+            description: `DBF with invalid field value (boolean type mismatch)`,
+            filename: 'vfp9_30.dbf',
+            recordCount: 2,
+            newFields: [],
+            newRecord: record => ({...record, FIELD6: 0}),
+            firstRecord: {},
+            error: `FIELD6: expected a boolean`,
+        },
+        {
+            description: 'DBF with field values set to null',
+            filename: 'PYACFL.DBF',
+            recordCount: 15,
+            newFields: [],
+            newRecord: record => ({...record, AFCLPD: null, AFHRPW: null, AFCRDA: null}),
+            firstRecord: {AFCLPD: '', AFHRPW: null, AFCRDA: null},
+        },
+        {
+            description: `VPF DBF with field values set to null`,
+            filename: 'vfp9_30.dbf',
+            recordCount: 2,
+            newFields: [],
+            newRecord: record => ({...record, FIELD1: null, FIELD3: null, FIELD4: null, FIELD6: null}),
+            firstRecord: {FIELD1: '', FIELD3: null, FIELD4: null, FIELD6: null},
+        },
     ];
 
     rimraf.sync(path.join(__dirname, `./fixtures/*.out`));
@@ -127,9 +189,9 @@ describe('Writing a DBF file', () => {
 
             let dstDbf: DBFFile;
             let records: Record<string, unknown>[];
+            let srcPath = path.join(__dirname, `./fixtures/${test.filename}`);
+            let dstPath = path.join(__dirname, `./fixtures/${test.filename}.out`);
             try {
-                let srcPath = path.join(__dirname, `./fixtures/${test.filename}`);
-                let dstPath = path.join(__dirname, `./fixtures/${test.filename}.out`);
                 let srcDbf = await DBFFile.open(srcPath, test.options);
                 dstDbf = await DBFFile.create(dstPath, srcDbf.fields.concat(test.newFields), test.options as any);
                 records = await srcDbf.readRecords(100);
@@ -140,6 +202,9 @@ describe('Writing a DBF file', () => {
             catch (err) {
                 expect(err.message).equals(expectedError ?? '??????');
                 return;
+            }
+            finally {
+                await fs.unlink(dstPath).catch(() => {});
             }
             expect(dstDbf.recordCount, 'the record count should match').equals(expectedRecordCount);
             expect(records[0], 'first record should match').to.deep.include(expectedFirstRecord!);
