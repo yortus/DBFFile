@@ -32,7 +32,11 @@ export class DBFFile {
     /** Metadata for all fields defined in the DBF file. */
     fields = [] as FieldDescriptor[];
 
-    /** Reads a subset of records from this DBF file. */
+    /**
+     * Reads a subset of records from this DBF file. If the `includeDeletedRecords` option is set, then deleted records
+     * are included in the results, otherwise they are skipped. Deleted records have the property `[DELETED]: true`,
+     * using the `DELETED` symbol exported from this library.
+     */
     readRecords(maxCount = 10000000) {
         return readRecordsFromDBF(this, maxCount);
     }
@@ -45,12 +49,19 @@ export class DBFFile {
     // Private.
     _readMode = 'strict' as 'strict' | 'loose';
     _encoding = '' as Encoding;
+    _includeDeletedRecords = false;
     _recordsRead = 0;
     _headerLength = 0;
     _recordLength = 0;
     _memoPath? = '';
     _version? = 0;
 }
+
+
+
+
+/** Symbol used for detecting deleted records when the `includeDeletedRecords` option is used. */
+export const DELETED = Symbol();
 
 
 
@@ -121,6 +132,7 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
         result.fields = fields;
         result._readMode = options.readMode;
         result._encoding = options.encoding;
+        result._includeDeletedRecords = options.includeDeletedRecords;
         result._recordsRead = 0;
         result._headerLength = headerLength;
         result._recordLength = recordLength;
@@ -251,7 +263,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
         let substr = (start: number, len: number, enc: string) => iconv.decode(buffer.slice(start, start + len), enc);
 
         // Read records in chunks, until enough records have been read.
-        let records: Array<Record<string, unknown>> = [];
+        let records: Array<Record<string, unknown> & {[DELETED]?: true}> = [];
         while (true) {
 
             // Work out how many records to read in this chunk.
@@ -270,9 +282,12 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
 
             // Parse each record.
             for (let i = 0, offset = 0; i < recordCountToRead; ++i) {
-                let record: Record<string, unknown> = {};
+                let record: Record<string, unknown> & {[DELETED]?: true} = {};
                 let isDeleted = (buffer[offset++] === 0x2a);
-                if (isDeleted) { offset += recordLength - 1; continue; }
+                if (isDeleted && !dbf._includeDeletedRecords) {
+                    offset += recordLength - 1;
+                    continue;
+                }
 
                 // Parse each field.
                 for (let j = 0; j < dbf.fields.length; ++j) {
@@ -407,7 +422,10 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                     record[field.name] = value;
                 }
 
-                //add the record to the result.
+                // If the record is marked as deleted, add the `[DELETED]` flag.
+                if (isDeleted) record[DELETED] = true;
+
+                // Add the record to the result.
                 records.push(record);
             }
         }
