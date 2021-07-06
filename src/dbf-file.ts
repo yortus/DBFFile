@@ -110,7 +110,9 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
         assert(buffer[0] === 0x0d, 'Invalid DBF: Expected header terminator');
 
         // Validate the record length.
-        assert(recordLength === calculateRecordLengthInBytes(fields), 'Invalid DBF: Incorrect record length');
+        const computedRecordLength = calculateRecordLengthInBytes(fields);
+        if (options.readMode === 'loose') recordLength = computedRecordLength;
+        assert(recordLength === computedRecordLength, 'Invalid DBF: Incorrect record length');
 
         // Return a new DBFFile instance.
         let result = new DBFFile();
