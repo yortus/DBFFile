@@ -302,11 +302,12 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                         case 'T': // DateTime
                             if (buffer[offset] === 0x20) {
                                 value = null;
-                                break;
                             }
-                            const julianDay = buffer.readInt32LE(offset);
-                            const msSinceMidnight = buffer.readInt32LE(offset + 4) + 1;
-                            value = parseVfpDateTime({julianDay, msSinceMidnight});
+                            else {
+                                const julianDay = buffer.readInt32LE(offset);
+                                const msSinceMidnight = buffer.readInt32LE(offset + 4) + 1;
+                                value = parseVfpDateTime({julianDay, msSinceMidnight});
+                            }
                             offset += 8;
                             break;
 
@@ -477,9 +478,14 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
                         break;
 
                     case 'T': // DateTime
-                        const {julianDay, msSinceMidnight} = formatVfpDateTime(value);
-                        buffer.writeInt32LE(julianDay, offset);
-                        buffer.writeInt32LE(msSinceMidnight, offset + 4);
+                        if (!value) {
+                            iconv.encode('        ', encoding).copy(buffer, offset, 0, 8);
+                        }
+                        else {
+                            const {julianDay, msSinceMidnight} = formatVfpDateTime(value);
+                            buffer.writeInt32LE(julianDay, offset);
+                            buffer.writeInt32LE(msSinceMidnight, offset + 4);
+                        }
                         offset += 8;
                         break;
 

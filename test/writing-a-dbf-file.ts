@@ -161,6 +161,22 @@ describe('Writing a DBF file', () => {
             firstRecord: {},
             error: `FIELD6: expected a boolean`,
         },
+        {
+            description: 'DBF with field values set to null',
+            filename: 'PYACFL.DBF',
+            recordCount: 15,
+            newFields: [],
+            newRecord: record => ({...record, AFCLPD: null, AFHRPW: null, AFCRDA: null}),
+            firstRecord: {AFCLPD: '', AFHRPW: null, AFCRDA: null},
+        },
+        {
+            description: `VPF DBF with field values set to null`,
+            filename: 'vfp9_30.dbf',
+            recordCount: 2,
+            newFields: [],
+            newRecord: record => ({...record, FIELD1: null, FIELD3: null, FIELD4: null, FIELD6: null}),
+            firstRecord: {FIELD1: '', FIELD3: null, FIELD4: null, FIELD6: null},
+        },
     ];
 
     rimraf.sync(path.join(__dirname, `./fixtures/*.out`));
