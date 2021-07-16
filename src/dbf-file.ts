@@ -29,6 +29,9 @@ export class DBFFile {
     /** Total number of records in the DBF file. (NB: includes deleted records). */
     recordCount = 0;
 
+    //** Date of last update */
+    lastUpdate: undefined | Date;
+
     /** Metadata for all fields defined in the DBF file. */
     fields = [] as FieldDescriptor[];
 
@@ -78,6 +81,9 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
         // Read various properties from the header record.
         await read(fd, buffer, 0, 32, 0);
         let fileVersion = buffer.readUInt8(0);
+        let year = buffer.readUInt8(1);
+        let month = buffer.readUInt8(2);
+        let day = buffer.readUInt8(3);
         let recordCount = buffer.readInt32LE(4);
         let headerLength = buffer.readInt16LE(8);
         let recordLength = buffer.readInt16LE(10);
@@ -129,6 +135,7 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
         let result = new DBFFile();
         result.path = path;
         result.recordCount = recordCount;
+        result.lastUpdate = new Date(year + 1900, month-1, day);
         result.fields = fields;
         result._readMode = options.readMode;
         result._encoding = options.encoding;
