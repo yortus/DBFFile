@@ -109,6 +109,9 @@ class DBFFile {
     /** Total number of records in the DBF file (NB: includes deleted records). */
     recordCount: number;
 
+    /** Date of last update as recorded in the DBF file header. */
+    dateOfLastUpdate: Date;
+
     /** Metadata for all fields defined in the DBF file. */
     fields: FieldDescriptor[];
 
