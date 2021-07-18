@@ -97,10 +97,13 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
 
         // Locate the memo file, if any. Allow missing memo files if reading in 'loose' mode.
         if (fileVersion === 0x83 || fileVersion === 0x8b) {
-            memoPath = path.slice(0, -extname(path).length) + '.dbt';
-            let isMemoFileMissing = await stat(memoPath).catch(() => 'missing') === 'missing';
-            if (isMemoFileMissing) memoPath = undefined;
-            if (options.readMode !== 'loose' && isMemoFileMissing) {
+            for (const ext of ['.dbt', '.DBT']) {
+                memoPath = path.slice(0, -extname(path).length) + ext;
+                let foundMemoFile = await stat(memoPath).catch(() => 'missing') !== 'missing';
+                if (foundMemoFile) break;
+                memoPath = undefined;
+            }
+            if (options.readMode !== 'loose' && !memoPath) {
                 throw new Error(`Memo file not found for file '${path}'.`);
             }
         }
