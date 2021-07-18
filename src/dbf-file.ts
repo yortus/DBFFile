@@ -5,7 +5,7 @@ import {FieldDescriptor, validateFieldDescriptor} from './field-descriptor';
 import {isValidFileVersion} from './file-version';
 import {CreateOptions, Encoding, normaliseCreateOptions, normaliseOpenOptions, OpenOptions} from './options';
 import {close, open, read, stat, write} from './utils';
-import {format8CharDate, formatVfpDateTime, parseVfpDateTime, parse8CharDate} from './utils';
+import {createDate, format8CharDate, formatVfpDateTime, parseVfpDateTime, parse8CharDate} from './utils';
 
 
 
@@ -29,8 +29,8 @@ export class DBFFile {
     /** Total number of records in the DBF file. (NB: includes deleted records). */
     recordCount = 0;
 
-    //** Date of last update */
-    lastUpdate: undefined | Date;
+    /** Date of last update as recorded in the DBF file header. */
+    dateOfLastUpdate!: Date;
 
     /** Metadata for all fields defined in the DBF file. */
     fields = [] as FieldDescriptor[];
@@ -81,9 +81,10 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
         // Read various properties from the header record.
         await read(fd, buffer, 0, 32, 0);
         let fileVersion = buffer.readUInt8(0);
-        let year = buffer.readUInt8(1);
-        let month = buffer.readUInt8(2);
-        let day = buffer.readUInt8(3);
+        let lastUpdateY = buffer.readUInt8(1); // number of years after 1900
+        let lastUpdateM = buffer.readUInt8(2); // 1-based
+        let lastUpdateD = buffer.readUInt8(3); // 1-based
+        const dateOfLastUpdate = createDate(lastUpdateY + 1900, lastUpdateM, lastUpdateD);
         let recordCount = buffer.readInt32LE(4);
         let headerLength = buffer.readInt16LE(8);
         let recordLength = buffer.readInt16LE(10);
@@ -135,7 +136,7 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
         let result = new DBFFile();
         result.path = path;
         result.recordCount = recordCount;
-        result.lastUpdate = new Date(year + 1900, month-1, day);
+        result.dateOfLastUpdate = dateOfLastUpdate;
         result.fields = fields;
         result._readMode = options.readMode;
         result._encoding = options.encoding;
