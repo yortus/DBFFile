@@ -34,6 +34,16 @@ export const write = promisify(fs.write);
 
 
 
+/** Creates a date with no local timezone offset. `month` and `day` are 1-based. */
+export function createDate(year: number, month: number, day: number): Date {
+    const yyyy = String(year).padStart(4, '0');
+    const mm = String(month).padStart(2, '0');
+    const dd = String(day).padStart(2, '0');
+    return new Date(`${yyyy}-${mm}-${dd}`);
+}
+
+
+
 /** Parses an 8-character date string of the form 'YYYYMMDD' into a UTC Date object. */
 export function parse8CharDate(s: string): Date {
     return new Date(`${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`);

@@ -20,6 +20,7 @@ Read and write .dbf (dBase III and Visual FoxPro) files in Node.js:
 - Can open an existing .dbf file
   - Can access all field descriptors
   - Can access total record count
+  - Can access date of last update
   - Can read records in arbitrary-sized batches
   - Can include deleted records in results
   - Supports very large files
@@ -107,6 +108,9 @@ class DBFFile {
 
     /** Total number of records in the DBF file (NB: includes deleted records). */
     recordCount: number;
+
+    /** Date of last update as recorded in the DBF file header. */
+    dateOfLastUpdate: Date;
 
     /** Metadata for all fields defined in the DBF file. */
     fields: FieldDescriptor[];
