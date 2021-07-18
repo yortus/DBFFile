@@ -177,8 +177,8 @@ async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateO
         buffer.writeUInt8(fileVersion, 0x00);                       // Version
         let now = new Date();                                       // date of last update (YYMMDD)
         buffer.writeUInt8(now.getFullYear() - 1900, 0x01);          // YY (year minus 1900)
-        buffer.writeUInt8(now.getMonth(), 0x02);                    // MM
-        buffer.writeUInt8(now.getDate(), 0x03);                     // DD
+        buffer.writeUInt8(now.getMonth()/* 0-based */ + 1, 0x02);   // MM (1-based)
+        buffer.writeUInt8(now.getDate()/* 1-based */, 0x03);        // DD (1-based)
         buffer.writeInt32LE(0, 0x04);                               // Number of records (set to zero)
         let headerLength = 34 + (fields.length * 32);
         buffer.writeUInt16LE(headerLength, 0x08);                   // Length of header structure
@@ -222,6 +222,7 @@ async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateO
         let result = new DBFFile();
         result.path = path;
         result.recordCount = 0;
+        result.dateOfLastUpdate = createDate(now.getFullYear(), now.getMonth() + 1, now.getDate());
         result.fields = fields.map(field => ({...field})); // make new copy of field descriptors
         result._readMode = 'strict';
         result._encoding = options.encoding;
