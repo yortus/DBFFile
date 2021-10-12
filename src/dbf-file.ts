@@ -107,6 +107,21 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
                 throw new Error(`Memo file not found for file '${path}'.`);
             }
         }
+        // Locate FoxPro9 memo file
+        if (fileVersion === 0x30) {
+            const dbExt = extname(path).toLowerCase(); // .dbf => .fpt | .pjx => .pjt | .scx => .sct | .vcx => .vct | .frx => .frt ...
+            const memoExt = dbExt == '.dbf' ? '.fpt' : `.${dbExt.substr(1,2)}t`;
+            for (const ext of [memoExt, memoExt.toUpperCase()]) {
+                memoPath = path.slice(0, -extname(path).length) + ext;
+                let foundMemoFile = await stat(memoPath).catch(() => 'missing') !== 'missing';
+                if (foundMemoFile) break;
+                memoPath = undefined;
+            }
+            // TODO: Throwing an error here is a breaking-change!
+            // if (options.readMode !== 'loose' && !memoPath) {
+            //     throw new Error(`Memo file not found for file '${path}'.`);
+            // }
+        }
 
         // Parse and validate all field descriptors. Skip validation if reading in 'loose' mode.
         let fields: FieldDescriptor[] = [];
