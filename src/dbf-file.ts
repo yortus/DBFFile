@@ -277,8 +277,15 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
         let memoBuf: Buffer | undefined;
         if (dbf._memoPath) {
             memoFd = await open(dbf._memoPath, 'r');
-            await read(memoFd, buffer, 0, 4, 4);
-            memoBlockSize = (dbf._version === 0x8b ? buffer.readInt32LE(0) : 0) || 512;
+            if (dbf._version === 0x30) {
+                // FoxPro9 
+                await read(memoFd, buffer, 0, 2, 6);
+                memoBlockSize = buffer.readUInt16BE(0) || 512;
+            } else {
+                // dBASE
+                await read(memoFd, buffer, 0, 4, 4);
+                memoBlockSize = (dbf._version === 0x8b ? buffer.readInt32LE(0) : 0) || 512;
+            }
             memoBuf = Buffer.alloc(memoBlockSize);
             memoFileSize = (await stat(dbf._memoPath)).size;
         }
@@ -288,6 +295,8 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
 
         // Create a convenience function for extracting strings from the buffer.
         let substr = (start: number, len: number, enc: string) => iconv.decode(buffer.slice(start, start + len), enc);
+
+        let toInt = (start: number, len: number) => buffer.slice(start, start + len).readInt32LE(0);
 
         // Read records in chunks, until enough records have been read.
         let records: Array<Record<string, unknown> & {[DELETED]?: true}> = [];
@@ -373,7 +382,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                         case 'M': // Memo
                             while (len > 0 && buffer[offset] === 0x20) ++offset, --len;
                             if (len === 0) { value = null; break; }
-                            let blockIndex = parseInt(substr(offset, len, encoding));
+                            let blockIndex = dbf._version === 0x30 ? toInt(offset, len) : parseInt(substr(offset, len, encoding));
                             offset += len;
 
                             // If the memo file is missing and we get this far, we must be in 'loose' read mode.
@@ -421,6 +430,35 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
 
                                     // Read the chunk of memo data, and break out of the loop when all read.
                                     let skip = isFirstBlockOfMemo ? 8 : 0;
+                                    let take = Math.min(len, memoBlockSize - skip);
+                                    value += iconv.decode(memoBuf.slice(skip, skip + take), encoding);
+                                    len -= take;
+                                    if (len === 0) break;
+                                }
+
+                                // Handle first/next block of FoxPro9 memo data.
+                                else if (dbf._version === 0x30) {
+                                    // Memo header
+                                    // 00 - 03: Next free block
+                                    // 04 - 05: Not used
+                                    // 06 - 07: Block size
+                                    // 08 - 511: Not used
+
+                                    // Memo Block
+                                    // 00 - 03: Type: 0 = image, 1 = text
+                                    // 04 - 07: Length
+                                    // 08 - N : Data
+
+                                    let skip = 0;
+                                    if (value === '') {
+                                        const memoType = memoBuf.readInt32BE(0);
+                                        if (memoType != 1) break;
+
+                                        len = memoBuf.readInt32BE(4);
+                                        skip = 8;
+                                    }
+                                    
+                                    // Read the chunk of memo data, and break out of the loop when all read.
                                     let take = Math.min(len, memoBlockSize - skip);
                                     value += iconv.decode(memoBuf.slice(skip, skip + take), encoding);
                                     len -= take;
