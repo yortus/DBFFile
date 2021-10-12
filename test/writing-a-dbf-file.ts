@@ -1,5 +1,6 @@
 import {expect} from 'chai';
 import {CreateOptions, DBFFile, FieldDescriptor, OpenOptions} from 'dbffile';
+import { FileVersion } from 'dbffile/file-version';
 import {promises as fs} from 'fs';
 import * as path from 'path';
 import * as rimraf from 'rimraf'
@@ -192,7 +193,9 @@ describe('Writing a DBF file', () => {
             let srcPath = path.join(__dirname, `./fixtures/${test.filename}`);
             let dstPath = path.join(__dirname, `./fixtures/${test.filename}.out`);
             try {
+                test.options ||= {};
                 let srcDbf = await DBFFile.open(srcPath, test.options);
+                test.options.fileVersion ||= srcDbf._version as FileVersion;
                 dstDbf = await DBFFile.create(dstPath, srcDbf.fields.concat(test.newFields), test.options as any);
                 records = await srcDbf.readRecords(100);
                 await dstDbf.appendRecords(records.map(test.newRecord));
