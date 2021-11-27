@@ -8,7 +8,7 @@ export interface FieldDescriptor {
      * The single-letter code for the field type.
      * C=string, N=numeric, F=float, L=logical, D=date, I=integer, M=memo, T=datetime, B=double.
      */
-    type: 'C' | 'N' | 'F' | 'L' | 'D' | 'I' | 'M' | 'T' | 'B';
+    type: 'C' | 'N' | 'F' | 'L' | 'D' | 'I' | 'M' | 'T' | 'B' | 'Y' | '0';
 
     /** The size of the field in bytes. */
     size: number;
@@ -21,7 +21,7 @@ export interface FieldDescriptor {
 
 
 export function validateFieldDescriptor(field: FieldDescriptor, fileVersion: number): void {
-    let {name, type, size, decimalPlaces: decs} = field;
+    let { name, type, size, decimalPlaces: decs } = field;
 
     // name
     if (typeof name !== 'string') throw new Error('Name must be a string');
@@ -53,4 +53,4 @@ export function validateFieldDescriptor(field: FieldDescriptor, fileVersion: num
 
 
 
-const FieldTypes: Array<FieldDescriptor['type']> = ['C', 'N', 'F', 'L', 'D', 'I', 'M', 'T', 'B'];
+const FieldTypes: Array<FieldDescriptor['type']> = ['C', 'N', 'F', 'L', 'D', 'I', 'M', 'T', 'B', 'Y', '0'];

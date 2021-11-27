@@ -1,11 +1,11 @@
 import * as assert from 'assert';
 import * as iconv from 'iconv-lite';
-import {extname} from 'path';
-import {FieldDescriptor, validateFieldDescriptor} from './field-descriptor';
-import {isValidFileVersion} from './file-version';
-import {CreateOptions, Encoding, normaliseCreateOptions, normaliseOpenOptions, OpenOptions} from './options';
-import {close, open, read, stat, write} from './utils';
-import {createDate, format8CharDate, formatVfpDateTime, parseVfpDateTime, parse8CharDate} from './utils';
+import { extname } from 'path';
+import { FieldDescriptor, validateFieldDescriptor } from './field-descriptor';
+import { isValidFileVersion } from './file-version';
+import { CreateOptions, Encoding, normaliseCreateOptions, normaliseOpenOptions, OpenOptions } from './options';
+import { close, open, read, stat, write } from './utils';
+import { createDate, format8CharDate, formatVfpDateTime, parseVfpDateTime, parse8CharDate } from './utils';
 
 
 
@@ -56,8 +56,8 @@ export class DBFFile {
     _recordsRead = 0;
     _headerLength = 0;
     _recordLength = 0;
-    _memoPath? = '';
-    _version? = 0;
+    _memoPath?= '';
+    _version?= 0;
 }
 
 
@@ -196,7 +196,7 @@ async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateO
 
         // Write the field descriptors.
         for (let i = 0; i < fields.length; ++i) {
-            let {name, type, size, decimalPlaces} = fields[i];
+            let { name, type, size, decimalPlaces } = fields[i];
             iconv.encode(name, 'ISO-8859-1').copy(buffer, 0);       // Field name (up to 10 chars)
             for (let j = name.length; j < 11; ++j) {                // null terminator(s)
                 buffer.writeUInt8(0, j);
@@ -226,7 +226,7 @@ async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateO
         result.path = path;
         result.recordCount = 0;
         result.dateOfLastUpdate = createDate(now.getFullYear(), now.getMonth() + 1, now.getDate());
-        result.fields = fields.map(field => ({...field})); // make new copy of field descriptors
+        result.fields = fields.map(field => ({ ...field })); // make new copy of field descriptors
         result._readMode = 'strict';
         result._encoding = options.encoding;
         result._recordsRead = 0;
@@ -275,7 +275,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
         let substr = (start: number, len: number, enc: string) => iconv.decode(buffer.slice(start, start + len), enc);
 
         // Read records in chunks, until enough records have been read.
-        let records: Array<Record<string, unknown> & {[DELETED]?: true}> = [];
+        let records: Array<Record<string, unknown> & { [DELETED]?: true }> = [];
         while (true) {
 
             // Work out how many records to read in this chunk.
@@ -294,7 +294,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
 
             // Parse each record.
             for (let i = 0, offset = 0; i < recordCountToRead; ++i) {
-                let record: Record<string, unknown> & {[DELETED]?: true} = {};
+                let record: Record<string, unknown> & { [DELETED]?: true } = {};
                 let isDeleted = (buffer[offset++] === 0x2a);
                 if (isDeleted && !dbf._includeDeletedRecords) {
                     offset += recordLength - 1;
@@ -335,7 +335,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             else {
                                 const julianDay = buffer.readInt32LE(offset);
                                 const msSinceMidnight = buffer.readInt32LE(offset + 4) + 1;
-                                value = parseVfpDateTime({julianDay, msSinceMidnight});
+                                value = parseVfpDateTime({ julianDay, msSinceMidnight });
                             }
                             offset += 8;
                             break;
@@ -419,6 +419,16 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                                     throw new Error(`Error reading memo file (read past end).`);
                                 }
                             }
+                            break;
+
+                        case 'Y': // Currency
+                            let tempValue = buffer.readInt32LE(offset).toString();
+                            value = parseFloat(tempValue.substring(0, tempValue.length - 4) + '.' + tempValue.substring(tempValue.length - 4));
+                            offset += field.size;
+                            break;
+
+                        case '0': // NULL_FLAGS
+                            value = substr(offset, field.size, encoding);
                             break;
 
                         default:
@@ -514,7 +524,7 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
                             iconv.encode('        ', encoding).copy(buffer, offset, 0, 8);
                         }
                         else {
-                            const {julianDay, msSinceMidnight} = formatVfpDateTime(value);
+                            const { julianDay, msSinceMidnight } = formatVfpDateTime(value);
                             buffer.writeInt32LE(julianDay, offset);
                             buffer.writeInt32LE(msSinceMidnight, offset + 4);
                         }
