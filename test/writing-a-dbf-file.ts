@@ -97,6 +97,16 @@ describe('Writing a DBF file', () => {
             },
         },
         {
+            description: `VFP DBF with memo file (version 0x30)`,
+            filename: 'vfp9_30_memo.dbf',
+            options: {fileVersion: 0x30},
+            recordCount: 0,
+            newFields: [],
+            newRecord: record => record,
+            firstRecord: {},
+            error: 'Writing to files with memo fields is not supported.',
+        },
+        {
             description: `DBF with unsupported version`,
             filename: 'dbase_83.dbf',
             options: {fileVersion: 0x31 as any},

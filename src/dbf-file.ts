@@ -107,6 +107,18 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
                 throw new Error(`Memo file not found for file '${path}'.`);
             }
         }
+        // Locate FoxPro9 memo file, if any. Version 0x30 may or may not have a memo file.
+        // Conventions for memo extensions: .dbf => .fpt | .pjx => .pjt | .scx => .sct | .vcx => .vct | .frx => .frt ...
+        if (fileVersion === 0x30) {
+            const dbExt = extname(path).toLowerCase();
+            const memoExt = dbExt == '.dbf' ? '.fpt' : `.${dbExt.substr(1,2)}t`;
+            for (const ext of [memoExt, memoExt.toUpperCase()]) {
+                memoPath = path.slice(0, -extname(path).length) + ext;
+                let foundMemoFile = await stat(memoPath).catch(() => 'missing') !== 'missing';
+                if (foundMemoFile) break;
+                memoPath = undefined;
+            }
+        }
 
         // Parse and validate all field descriptors. Skip validation if reading in 'loose' mode.
         let fields: FieldDescriptor[] = [];
@@ -262,8 +274,15 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
         let memoBuf: Buffer | undefined;
         if (dbf._memoPath) {
             memoFd = await open(dbf._memoPath, 'r');
-            await read(memoFd, buffer, 0, 4, 4);
-            memoBlockSize = (dbf._version === 0x8b ? buffer.readInt32LE(0) : 0) || 512;
+            if (dbf._version === 0x30) {
+                // FoxPro9 
+                await read(memoFd, buffer, 0, 2, 6);
+                memoBlockSize = buffer.readUInt16BE(0) || 512;
+            } else {
+                // dBASE
+                await read(memoFd, buffer, 0, 4, 4);
+                memoBlockSize = (dbf._version === 0x8b ? buffer.readInt32LE(0) : 0) || 512;
+            }
             memoBuf = Buffer.alloc(memoBlockSize);
             memoFileSize = (await stat(dbf._memoPath)).size;
         }
@@ -271,8 +290,9 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
         // Calculate the file position at which to start reading.
         let currentPosition = dbf._headerLength + recordLength * dbf._recordsRead;
 
-        // Create a convenience function for extracting strings from the buffer.
-        let substr = (start: number, len: number, enc: string) => iconv.decode(buffer.slice(start, start + len), enc);
+        // Create convenience functions for extracting values from the buffer.
+        let substrAt = (start: number, len: number, enc: string) => iconv.decode(buffer.slice(start, start + len), enc);
+        let int32At = (start: number, len: number) => buffer.slice(start, start + len).readInt32LE(0);
 
         // Read records in chunks, until enough records have been read.
         let records: Array<Record<string, unknown> & {[DELETED]?: true}> = [];
@@ -312,14 +332,14 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                     switch (field.type) {
                         case 'C': // Text
                             while (len > 0 && buffer[offset + len - 1] === 0x20) --len;
-                            value = substr(offset, len, encoding);
+                            value = substrAt(offset, len, encoding);
                             offset += field.size;
                             break;
 
                         case 'N': // Number
                         case 'F': // Float - appears to be treated identically to Number
                             while (len > 0 && buffer[offset] === 0x20) ++offset, --len;
-                            value = len > 0 ? parseFloat(substr(offset, len, encoding)) : null;
+                            value = len > 0 ? parseFloat(substrAt(offset, len, encoding)) : null;
                             offset += len;
                             break;
 
@@ -341,7 +361,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             break;
 
                         case 'D': // Date
-                            value = buffer[offset] === 0x20 ? null : parse8CharDate(substr(offset, 8, encoding));
+                            value = buffer[offset] === 0x20 ? null : parse8CharDate(substrAt(offset, 8, encoding));
                             offset += 8;
                             break;
 
@@ -358,7 +378,9 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                         case 'M': // Memo
                             while (len > 0 && buffer[offset] === 0x20) ++offset, --len;
                             if (len === 0) { value = null; break; }
-                            let blockIndex = parseInt(substr(offset, len, encoding));
+                            let blockIndex = dbf._version === 0x30
+                                ? int32At(offset, len)
+                                : parseInt(substrAt(offset, len, encoding));
                             offset += len;
 
                             // If the memo file is missing and we get this far, we must be in 'loose' read mode.
@@ -406,6 +428,34 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
 
                                     // Read the chunk of memo data, and break out of the loop when all read.
                                     let skip = isFirstBlockOfMemo ? 8 : 0;
+                                    let take = Math.min(len, memoBlockSize - skip);
+                                    value += iconv.decode(memoBuf.slice(skip, skip + take), encoding);
+                                    len -= take;
+                                    if (len === 0) break;
+                                }
+
+                                // Handle first/next block of FoxPro9 memo data.
+                                else if (dbf._version === 0x30) {
+                                    // Memo header
+                                    // 00 - 03: Next free block
+                                    // 04 - 05: Not used
+                                    // 06 - 07: Block size
+                                    // 08 - 511: Not used
+
+                                    // Memo Block
+                                    // 00 - 03: Type: 0 = image, 1 = text
+                                    // 04 - 07: Length
+                                    // 08 - N : Data
+
+                                    let skip = 0;
+                                    if (value === '') {
+                                        const memoType = memoBuf.readInt32BE(0);
+                                        if (memoType != 1) break;
+                                        len = memoBuf.readInt32BE(4);
+                                        skip = 8;
+                                    }
+                                    
+                                    // Read the chunk of memo data, and break out of the loop when all read.
                                     let take = Math.min(len, memoBlockSize - skip);
                                     value += iconv.decode(memoBuf.slice(skip, skip + take), encoding);
                                     len -= take;
