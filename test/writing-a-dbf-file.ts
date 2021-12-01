@@ -1,6 +1,5 @@
 import {expect} from 'chai';
 import {CreateOptions, DBFFile, FieldDescriptor, OpenOptions} from 'dbffile';
-import { FileVersion } from 'dbffile/file-version';
 import {promises as fs} from 'fs';
 import * as path from 'path';
 import * as rimraf from 'rimraf'
@@ -98,6 +97,16 @@ describe('Writing a DBF file', () => {
             },
         },
         {
+            description: `VFP DBF with memo file (version 0x30)`,
+            filename: 'vfp9_30_memo.dbf',
+            options: {fileVersion: 0x30},
+            recordCount: 0,
+            newFields: [],
+            newRecord: record => record,
+            firstRecord: {},
+            error: 'Writing to files with memo fields is not supported.',
+        },
+        {
             description: `DBF with unsupported version`,
             filename: 'dbase_83.dbf',
             options: {fileVersion: 0x31 as any},
@@ -193,9 +202,7 @@ describe('Writing a DBF file', () => {
             let srcPath = path.join(__dirname, `./fixtures/${test.filename}`);
             let dstPath = path.join(__dirname, `./fixtures/${test.filename}.out`);
             try {
-                test.options ||= {};
                 let srcDbf = await DBFFile.open(srcPath, test.options);
-                test.options.fileVersion ||= srcDbf._version as FileVersion;
                 dstDbf = await DBFFile.create(dstPath, srcDbf.fields.concat(test.newFields), test.options as any);
                 records = await srcDbf.readRecords(100);
                 await dstDbf.appendRecords(records.map(test.newRecord));
