@@ -107,9 +107,10 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
                 throw new Error(`Memo file not found for file '${path}'.`);
             }
         }
-        // Locate FoxPro9 memo file
+        // Locate FoxPro9 memo file, if any. Version 0x30 may or may not have a memo file.
+        // Conventions for memo extensions: .dbf => .fpt | .pjx => .pjt | .scx => .sct | .vcx => .vct | .frx => .frt ...
         if (fileVersion === 0x30) {
-            const dbExt = extname(path).toLowerCase(); // .dbf => .fpt | .pjx => .pjt | .scx => .sct | .vcx => .vct | .frx => .frt ...
+            const dbExt = extname(path).toLowerCase();
             const memoExt = dbExt == '.dbf' ? '.fpt' : `.${dbExt.substr(1,2)}t`;
             for (const ext of [memoExt, memoExt.toUpperCase()]) {
                 memoPath = path.slice(0, -extname(path).length) + ext;
@@ -117,10 +118,6 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
                 if (foundMemoFile) break;
                 memoPath = undefined;
             }
-            // TODO: Throwing an error here is a breaking-change!
-            // if (options.readMode !== 'loose' && !memoPath) {
-            //     throw new Error(`Memo file not found for file '${path}'.`);
-            // }
         }
 
         // Parse and validate all field descriptors. Skip validation if reading in 'loose' mode.
@@ -293,10 +290,9 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
         // Calculate the file position at which to start reading.
         let currentPosition = dbf._headerLength + recordLength * dbf._recordsRead;
 
-        // Create a convenience function for extracting strings from the buffer.
-        let substr = (start: number, len: number, enc: string) => iconv.decode(buffer.slice(start, start + len), enc);
-
-        let toInt = (start: number, len: number) => buffer.slice(start, start + len).readInt32LE(0);
+        // Create convenience functions for extracting values from the buffer.
+        let substrAt = (start: number, len: number, enc: string) => iconv.decode(buffer.slice(start, start + len), enc);
+        let int32At = (start: number, len: number) => buffer.slice(start, start + len).readInt32LE(0);
 
         // Read records in chunks, until enough records have been read.
         let records: Array<Record<string, unknown> & {[DELETED]?: true}> = [];
@@ -336,14 +332,14 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                     switch (field.type) {
                         case 'C': // Text
                             while (len > 0 && buffer[offset + len - 1] === 0x20) --len;
-                            value = substr(offset, len, encoding);
+                            value = substrAt(offset, len, encoding);
                             offset += field.size;
                             break;
 
                         case 'N': // Number
                         case 'F': // Float - appears to be treated identically to Number
                             while (len > 0 && buffer[offset] === 0x20) ++offset, --len;
-                            value = len > 0 ? parseFloat(substr(offset, len, encoding)) : null;
+                            value = len > 0 ? parseFloat(substrAt(offset, len, encoding)) : null;
                             offset += len;
                             break;
 
@@ -365,7 +361,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             break;
 
                         case 'D': // Date
-                            value = buffer[offset] === 0x20 ? null : parse8CharDate(substr(offset, 8, encoding));
+                            value = buffer[offset] === 0x20 ? null : parse8CharDate(substrAt(offset, 8, encoding));
                             offset += 8;
                             break;
 
@@ -382,7 +378,9 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                         case 'M': // Memo
                             while (len > 0 && buffer[offset] === 0x20) ++offset, --len;
                             if (len === 0) { value = null; break; }
-                            let blockIndex = dbf._version === 0x30 ? toInt(offset, len) : parseInt(substr(offset, len, encoding));
+                            let blockIndex = dbf._version === 0x30
+                                ? int32At(offset, len)
+                                : parseInt(substrAt(offset, len, encoding));
                             offset += len;
 
                             // If the memo file is missing and we get this far, we must be in 'loose' read mode.
@@ -453,7 +451,6 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                                     if (value === '') {
                                         const memoType = memoBuf.readInt32BE(0);
                                         if (memoType != 1) break;
-
                                         len = memoBuf.readInt32BE(4);
                                         skip = 8;
                                     }
