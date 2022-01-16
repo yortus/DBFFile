@@ -39,9 +39,13 @@ export class DBFFile {
      * Reads a subset of records from this DBF file. If the `includeDeletedRecords` option is set, then deleted records
      * are included in the results, otherwise they are skipped. Deleted records have the property `[DELETED]: true`,
      * using the `DELETED` symbol exported from this library.
+     * 
+     * The handler is to save memory. If provided we don't return
+     * an array with all data. Cuz when I tried to check death data from Brazil
+     * to check some hypothesis my comp cant handle the 1.4M rows in memory.
      */
-    readRecords(maxCount = 10000000) {
-        return readRecordsFromDBF(this, maxCount);
+    readRecords(maxCount = 10000000, handler: any) {
+        return readRecordsFromDBF(this, maxCount, handler);
     }
 
     /** Appends the specified records to this DBF file. */
@@ -256,7 +260,7 @@ async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateO
 
 
 // Private implementation of DBFFile#readRecords
-async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
+async function readRecordsFromDBF(dbf: DBFFile, maxCount: number, handler: any) {
     let fd = 0;
     let memoFd = 0;
     try {
@@ -487,8 +491,12 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                 // If the record is marked as deleted, add the `[DELETED]` flag.
                 if (isDeleted) record[DELETED] = true;
 
-                // Add the record to the result.
-                records.push(record);
+                if (handler) {
+                    handler(record)
+                } else {
+                    // Add the record to the result.
+                    records.push(record);
+                }
             }
         }
 
