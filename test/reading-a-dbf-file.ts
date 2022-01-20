@@ -235,7 +235,7 @@ describe('Reading a DBF file', () => {
                 dbf = await DBFFile.open(filepath, options);
                 records = await dbf.readRecords();
             }
-            catch (err) {
+            catch (err:any) {
                 expect(err.message).contains(expectedError ?? '??????');
                 return;
             }

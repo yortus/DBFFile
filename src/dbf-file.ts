@@ -109,7 +109,7 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
         }
         // Locate FoxPro9 memo file, if any. Version 0x30 may or may not have a memo file.
         // Conventions for memo extensions: .dbf => .fpt | .pjx => .pjt | .scx => .sct | .vcx => .vct | .frx => .frt ...
-        if (fileVersion === 0x30) {
+        if (fileVersion === 0x30 || fileVersion === 0xF5) {
             const dbExt = extname(path).toLowerCase();
             const memoExt = dbExt == '.dbf' ? '.fpt' : `.${dbExt.substr(1,2)}t`;
             for (const ext of [memoExt, memoExt.toUpperCase()]) {

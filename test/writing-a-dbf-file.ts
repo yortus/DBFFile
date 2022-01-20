@@ -209,7 +209,7 @@ describe('Writing a DBF file', () => {
                 dstDbf = await DBFFile.open(dstPath, test.options);
                 records = await dstDbf.readRecords(500);
             }
-            catch (err) {
+            catch (err:any) {
                 expect(err.message).equals(expectedError ?? '??????');
                 return;
             }
