@@ -435,7 +435,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                                 }
 
                                 // Handle first/next block of FoxPro9 memo data.
-                                else if (dbf._version === 0x30) {
+                                else if (dbf._version === 0x30 || dbf._version === 0xF5) {
                                     // Memo header
                                     // 00 - 03: Next free block
                                     // 04 - 05: Not used
