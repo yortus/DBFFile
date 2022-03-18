@@ -1,7 +1,7 @@
 import {expect} from 'chai';
 import {DBFFile, OpenOptions, DELETED} from 'dbffile';
 import * as path from 'path';
-
+import nodeFileSystem from 'dbffile/node-file-system';
 
 
 
@@ -232,7 +232,7 @@ describe('Reading a DBF file', () => {
             let dbf: DBFFile;
             let records: Array<Record<string, unknown> & {[DELETED]?: true}>;
             try {
-                dbf = await DBFFile.open(filepath, options);
+                dbf = await DBFFile.open(nodeFileSystem, filepath, options);
                 records = await dbf.readRecords();
             }
             catch (err) {

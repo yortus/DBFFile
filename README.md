@@ -42,10 +42,10 @@ Read and write .dbf (dBase III and Visual FoxPro) files in Node.js:
 ### Example: reading a .dbf file
 
 ```javascript
-import {DBFFile} from 'dbffile';
+import {DBFFile, nodeFileSystem} from 'dbffile';
 
 async function testRead() {
-    let dbf = await DBFFile.open('<full path to .dbf file>');
+    let dbf = await DBFFile.open(nodeFileSystem, '<full path to .dbf file>');
     console.log(`DBF file contains ${dbf.recordCount} records.`);
     console.log(`Field names: ${dbf.fields.map(f => f.name).join(', ')}`);
     let records = await dbf.readRecords(100);
@@ -56,7 +56,7 @@ async function testRead() {
 ### Example: writing a .dbf file
 
 ```javascript
-import {DBFFile} from 'dbffile';
+import {DBFFile, nodeFileSystem} from 'dbffile';
 
 async function testWrite() {
     let fieldDescriptors = [
@@ -69,7 +69,7 @@ async function testWrite() {
         { fname: 'Mary', lname: 'Smith' }
     ];
 
-    let dbf = await DBFFile.create('<full path to .dbf file>', fieldDescriptors);
+    let dbf = await DBFFile.create(nodeFileSystem, '<full path to .dbf file>', fieldDescriptors);
     console.log('DBF file created.');
     await dbf.appendRecords(records);
     console.log(`${records.length} records added.`);
@@ -98,10 +98,10 @@ The module exports the `DBFFile` class, which has the following shape:
 class DBFFile {
 
     /** Opens an existing DBF file. */
-    static open(path: string, options?: OpenOptions): Promise<DBFFile>;
+    static open(fileSystem: FileSystem, path: string, options?: OpenOptions): Promise<DBFFile>;
 
     /** Creates a new DBF file with no records. */
-    static create(path: string, fields: FieldDescriptor[], options?: CreateOptions): Promise<DBFFile>;
+    static create(fileSystem: FileSystem, path: string, fields: FieldDescriptor[], options?: CreateOptions): Promise<DBFFile>;
 
     /** Full path to the DBF file. */
     path: string;
@@ -121,6 +121,28 @@ class DBFFile {
     /** Appends the specified records to this DBF file. */
     appendRecords(records: object[]): Promise<DBFFile>;
 }
+
+/** Represents file system */
+interface FileSystem {
+    /** Opens existing file */
+    open(path: string, flags: string): Promise<number>,
+
+    /** Close file handle */
+    close(fd: number): Promise<void>,
+
+    /** Read data from file into buffer */
+    read(fd: number, buffer: Buffer, offset: number, length: number, position: number): Promise<{bytesRead: number, buffer: Buffer}>,
+
+    /** Write data from buffer to file */
+    write(fd: number, buffer: Buffer, offset: number, length: number, position: number): Promise<{bytesWritten: number, buffer: Buffer}>,
+
+    /** Checks if a file exists */
+    exists(path: string): Promise<boolean>,
+
+    /** Returns file size */
+    fileSize(path: string): Promise<number>
+};
+
 
 /** Metadata describing a single field in a DBF file. */
 interface FieldDescriptor {

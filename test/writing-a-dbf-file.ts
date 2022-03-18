@@ -3,6 +3,7 @@ import {CreateOptions, DBFFile, FieldDescriptor, OpenOptions} from 'dbffile';
 import {promises as fs} from 'fs';
 import * as path from 'path';
 import * as rimraf from 'rimraf'
+import nodeFileSystem from 'dbffile/node-file-system';
 
 
 
@@ -202,11 +203,11 @@ describe('Writing a DBF file', () => {
             let srcPath = path.join(__dirname, `./fixtures/${test.filename}`);
             let dstPath = path.join(__dirname, `./fixtures/${test.filename}.out`);
             try {
-                let srcDbf = await DBFFile.open(srcPath, test.options);
-                dstDbf = await DBFFile.create(dstPath, srcDbf.fields.concat(test.newFields), test.options as any);
+                let srcDbf = await DBFFile.open(nodeFileSystem, srcPath, test.options);
+                dstDbf = await DBFFile.create(nodeFileSystem, dstPath, srcDbf.fields.concat(test.newFields), test.options as any);
                 records = await srcDbf.readRecords(100);
                 await dstDbf.appendRecords(records.map(test.newRecord));
-                dstDbf = await DBFFile.open(dstPath, test.options);
+                dstDbf = await DBFFile.open(nodeFileSystem, dstPath, test.options);
                 records = await dstDbf.readRecords(500);
             }
             catch (err) {

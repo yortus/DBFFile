@@ -1,26 +1,50 @@
 import * as assert from 'assert';
 import * as iconv from 'iconv-lite';
-import {extname} from 'path';
 import {FieldDescriptor, validateFieldDescriptor} from './field-descriptor';
 import {isValidFileVersion} from './file-version';
 import {CreateOptions, Encoding, normaliseCreateOptions, normaliseOpenOptions, OpenOptions} from './options';
-import {close, open, read, stat, write} from './utils';
 import {createDate, format8CharDate, formatVfpDateTime, parseVfpDateTime, parse8CharDate} from './utils';
+import * as buffer from 'buffer';
 
+const Buffer = buffer.Buffer;
 
+const extRegexp = /\.(.+)$/;
 
+const replaceExtension = function (fileName: string, newExtension: string): string {
+    return fileName.replace(extRegexp, newExtension);
+};
+
+export interface FileSystem {
+    /** Opens existing file */
+    open(path: string, flags: string): Promise<number>,
+
+    /** Close file handle */
+    close(fd: number): Promise<void>,
+
+    /** Read data from file into buffer */
+    read(fd: number, buffer: Buffer, offset: number, length: number, position: number): Promise<{bytesRead: number, buffer: Buffer}>,
+
+    /** Write data from buffer to file */
+    write(fd: number, buffer: Buffer, offset: number, length: number, position: number): Promise<{bytesWritten: number, buffer: Buffer}>,
+
+    /** Checks if a file exists */
+    exists(path: string): Promise<boolean>,
+
+    /** Returns file size */
+    fileSize(path: string): Promise<number>
+};
 
 /** Represents a DBF file. */
 export class DBFFile {
 
     /** Opens an existing DBF file. */
-    static async open(path: string, options?: OpenOptions) {
-        return openDBF(path, options);
+    static async open(fs: FileSystem, path: string, options?: OpenOptions) {
+        return openDBF(fs, path, options);
     }
 
     /** Creates a new DBF file with no records. */
-    static async create(path: string, fields: FieldDescriptor[], options?: CreateOptions) {
-        return createDBF(path, fields, options);
+    static async create(fs: FileSystem, path: string, fields: FieldDescriptor[], options?: CreateOptions) {
+        return createDBF(fs, path, fields, options);
     }
 
     /** Full path to the DBF file. */
@@ -49,6 +73,8 @@ export class DBFFile {
         return appendRecordsToDBF(this, records);
     }
 
+    fileSystem: FileSystem | undefined = undefined;
+
     // Private.
     _readMode = 'strict' as 'strict' | 'loose';
     _encoding = '' as Encoding;
@@ -70,16 +96,16 @@ export const DELETED = Symbol();
 
 
 //-------------------- Private implementation starts here --------------------
-async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
+async function openDBF(fileSystem: FileSystem, path: string, opts?: OpenOptions): Promise<DBFFile> {
     let options = normaliseOpenOptions(opts);
     let fd = 0;
     try {
         // Open the file and create a buffer to read through.
-        fd = await open(path, 'r');
+        fd = await fileSystem.open(path, 'r');
         let buffer = Buffer.alloc(32);
 
         // Read various properties from the header record.
-        await read(fd, buffer, 0, 32, 0);
+        await fileSystem.read(fd, buffer, 0, 32, 0);
         let fileVersion = buffer.readUInt8(0);
         let lastUpdateY = buffer.readUInt8(1); // number of years after 1900
         let lastUpdateM = buffer.readUInt8(2); // 1-based
@@ -98,8 +124,8 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
         // Locate the memo file, if any. Allow missing memo files if reading in 'loose' mode.
         if (fileVersion === 0x83 || fileVersion === 0x8b) {
             for (const ext of ['.dbt', '.DBT']) {
-                memoPath = path.slice(0, -extname(path).length) + ext;
-                let foundMemoFile = await stat(memoPath).catch(() => 'missing') !== 'missing';
+                memoPath = replaceExtension(path, ext);
+                let foundMemoFile = await fileSystem.exists(memoPath);
                 if (foundMemoFile) break;
                 memoPath = undefined;
             }
@@ -110,11 +136,12 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
         // Locate FoxPro9 memo file, if any. Version 0x30 may or may not have a memo file.
         // Conventions for memo extensions: .dbf => .fpt | .pjx => .pjt | .scx => .sct | .vcx => .vct | .frx => .frt ...
         if (fileVersion === 0x30) {
-            const dbExt = extname(path).toLowerCase();
-            const memoExt = dbExt == '.dbf' ? '.fpt' : `.${dbExt.substr(1,2)}t`;
+            const extMatch = extRegexp.exec(path);
+            const dbExt = extMatch ? extMatch[0].toLowerCase() : '';
+            const memoExt = dbExt == '.dbf' ? '.fpt' : `.${dbExt.substr(1, 2)}t`;
             for (const ext of [memoExt, memoExt.toUpperCase()]) {
-                memoPath = path.slice(0, -extname(path).length) + ext;
-                let foundMemoFile = await stat(memoPath).catch(() => 'missing') !== 'missing';
+                memoPath = replaceExtension(path, ext);
+                let foundMemoFile = await fileSystem.exists(memoPath);
                 if (foundMemoFile) break;
                 memoPath = undefined;
             }
@@ -123,7 +150,7 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
         // Parse and validate all field descriptors. Skip validation if reading in 'loose' mode.
         let fields: FieldDescriptor[] = [];
         while (headerLength > 32 + fields.length * 32) {
-            await read(fd, buffer, 0, 32, 32 + fields.length * 32);
+            await fileSystem.read(fd, buffer, 0, 32, 32 + fields.length * 32);
             if (buffer.readUInt8(0) === 0x0D) break;
             let field: FieldDescriptor = {
                 name: iconv.decode(buffer.slice(0, 10), 'ISO-8859-1').split('\0')[0],
@@ -139,7 +166,7 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
         }
 
         // Parse the header terminator.
-        await read(fd, buffer, 0, 1, 32 + fields.length * 32);
+        await fileSystem.read(fd, buffer, 0, 1, 32 + fields.length * 32);
         assert(buffer[0] === 0x0d, 'Invalid DBF: Expected header terminator');
 
         // Validate the record length.
@@ -149,6 +176,7 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
 
         // Return a new DBFFile instance.
         let result = new DBFFile();
+        result.fileSystem = fileSystem;
         result.path = path;
         result.recordCount = recordCount;
         result.dateOfLastUpdate = dateOfLastUpdate;
@@ -165,14 +193,14 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
     }
     finally {
         // Close the file.
-        if (fd) await close(fd);
+        if (fd) await fileSystem.close(fd);
     }
 };
 
 
 
 
-async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateOptions): Promise<DBFFile> {
+async function createDBF(fileSystem: FileSystem, path: string, fields: FieldDescriptor[], opts?: CreateOptions): Promise<DBFFile> {
     let options = normaliseCreateOptions(opts);
     let fd = 0;
     try {
@@ -185,7 +213,7 @@ async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateO
         if (fields.some(f => f.type === 'M')) throw new Error(`Writing to files with memo fields is not supported.`);
 
         // Create the file and create a buffer to write through.
-        fd = await open(path, 'wx');
+        fd = await fileSystem.open(path, 'wx');
         let buffer = Buffer.alloc(32);
 
         // Write the header structure up to the field descriptors.
@@ -204,7 +232,7 @@ async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateO
         buffer.writeUInt32LE(0, 0x14);                              // Reserved/unused (set to zero)
         buffer.writeUInt32LE(0, 0x18);                              // Reserved/unused (set to zero)
         buffer.writeUInt32LE(0, 0x1C);                              // Reserved/unused (set to zero)
-        await write(fd, buffer, 0, 32, 0);
+        await fileSystem.write(fd, buffer, 0, 32, 0);
 
         // Write the field descriptors.
         for (let i = 0; i < fields.length; ++i) {
@@ -224,17 +252,18 @@ async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateO
             buffer.writeUInt32LE(0, 0x18);                          // Reserved (set to zero)
             buffer.writeUInt32LE(0, 0x1C);                          // Reserved (set to zero)
             buffer.writeUInt8(0, 0x1F);                             // Index field flag (set to zero)
-            await write(fd, buffer, 0, 32, 32 + i * 32);
+            await fileSystem.write(fd, buffer, 0, 32, 32 + i * 32);
         }
 
         // Write the header terminator and EOF marker.
         buffer.writeUInt8(0x0D, 0);                             // Header terminator
         buffer.writeUInt8(0x00, 1);                             // Null byte (unnecessary but common, accounted for in header length)
         buffer.writeUInt8(0x1A, 2);                             // EOF marker
-        await write(fd, buffer, 0, 3, 32 + fields.length * 32);
+        await fileSystem.write(fd, buffer, 0, 3, 32 + fields.length * 32);
 
         // Return a new DBFFile instance.
         let result = new DBFFile();
+        result.fileSystem = fileSystem;
         result.path = path;
         result.recordCount = 0;
         result.dateOfLastUpdate = createDate(now.getFullYear(), now.getMonth() + 1, now.getDate());
@@ -248,7 +277,7 @@ async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateO
     }
     finally {
         // Close the file.
-        if (fd) await close(fd);
+        if (fd) await fileSystem.close(fd);
     }
 };
 
@@ -257,11 +286,15 @@ async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateO
 
 // Private implementation of DBFFile#readRecords
 async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
+    const {fileSystem} = dbf;
+    if (!fileSystem) {
+        throw new Error(`DBF file system is not set.`);
+    }
     let fd = 0;
     let memoFd = 0;
     try {
         // Open the file and prepare to create a buffer to read through.
-        fd = await open(dbf.path, 'r');
+        fd = await fileSystem.open(dbf.path, 'r');
         let recordCountPerBuffer = 1000;
         let recordLength = dbf._recordLength;
         let buffer = Buffer.alloc(recordLength * recordCountPerBuffer);
@@ -273,18 +306,18 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
         let memoFileSize = 0;
         let memoBuf: Buffer | undefined;
         if (dbf._memoPath) {
-            memoFd = await open(dbf._memoPath, 'r');
+            memoFd = await fileSystem.open(dbf._memoPath, 'r');
             if (dbf._version === 0x30) {
                 // FoxPro9 
-                await read(memoFd, buffer, 0, 2, 6);
+                await fileSystem.read(memoFd, buffer, 0, 2, 6);
                 memoBlockSize = buffer.readUInt16BE(0) || 512;
             } else {
                 // dBASE
-                await read(memoFd, buffer, 0, 4, 4);
+                await fileSystem.read(memoFd, buffer, 0, 4, 4);
                 memoBlockSize = (dbf._version === 0x8b ? buffer.readInt32LE(0) : 0) || 512;
             }
             memoBuf = Buffer.alloc(memoBlockSize);
-            memoFileSize = (await stat(dbf._memoPath)).size;
+            memoFileSize = await fileSystem.fileSize(dbf._memoPath);
         }
 
         // Calculate the file position at which to start reading.
@@ -308,7 +341,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
             if (recordCountToRead === 0) break;
 
             // Read the chunk of records into the buffer.
-            await read(fd, buffer, 0, recordLength * recordCountToRead, currentPosition);
+            await fileSystem.read(fd, buffer, 0, recordLength * recordCountToRead, currentPosition);
             dbf._recordsRead += recordCountToRead;
             currentPosition += recordLength * recordCountToRead;
 
@@ -395,7 +428,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             while (true) {
 
                                 // Read the next block-sized chunk from the memo file.
-                                await read(memoFd, memoBuf, 0, memoBlockSize, blockIndex * memoBlockSize);
+                                await fileSystem.read(memoFd, memoBuf, 0, memoBlockSize, blockIndex * memoBlockSize);
 
                                 // Handle first/next block of dBase III memo data.
                                 if (dbf._version === 0x83) {
@@ -454,7 +487,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                                         len = memoBuf.readInt32BE(4);
                                         skip = 8;
                                     }
-                                    
+
                                     // Read the chunk of memo data, and break out of the loop when all read.
                                     let take = Math.min(len, memoBlockSize - skip);
                                     value += iconv.decode(memoBuf.slice(skip, skip + take), encoding);
@@ -497,8 +530,8 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
     }
     finally {
         // Close the file(s).
-        if (fd) await close(fd);
-        if (memoFd) await close(memoFd);
+        if (fd) await fileSystem.close(fd);
+        if (memoFd) await fileSystem.close(memoFd);
     }
 };
 
@@ -507,10 +540,14 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
 
 // Private implementation of DBFFile#appendRecords
 async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, unknown>>): Promise<DBFFile> {
+    const {fileSystem} = dbf;
+    if (!fileSystem) {
+        throw new Error(`DBF file system is not set.`);
+    }
     let fd = 0;
     try {
         // Open the file and create a buffer to read and write through.
-        fd = await open(dbf.path, 'r+');
+        fd = await fileSystem.open(dbf.path, 'r+');
         let recordLength = calculateRecordLengthInBytes(dbf.fields);
         let buffer = Buffer.alloc(recordLength + 4);
 
@@ -596,25 +633,25 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
                         throw new Error(`Type '${field.type}' is not supported`);
                 }
             }
-            await write(fd, buffer, 0, recordLength, currentPosition);
+            await fileSystem.write(fd, buffer, 0, recordLength, currentPosition);
             currentPosition += recordLength;
         }
 
         // Write a new EOF marker.
         buffer.writeUInt8(0x1A, 0);
-        await write(fd, buffer, 0, 1, currentPosition);
+        await fileSystem.write(fd, buffer, 0, 1, currentPosition);
 
         // Update the record count in the file and in the DBFFile instance.
         dbf.recordCount += records.length;
         buffer.writeInt32LE(dbf.recordCount, 0);
-        await write(fd, buffer, 0, 4, 0x04);
+        await fileSystem.write(fd, buffer, 0, 4, 0x04);
 
         // Return the same DBFFile instance.
         return dbf;
     }
     finally {
         // Close the file.
-        if (fd) await close(fd);
+        if (fd) await fileSystem.close(fd);
     }
 };
 

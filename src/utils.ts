@@ -1,38 +1,3 @@
-import * as fs from 'fs';
-import {promisify} from 'util';
-
-
-
-
-/** Promisified version of fs.close. */
-export const close = promisify(fs.close);
-
-
-
-
-/** Promisified version of fs.open. */
-export const open = promisify(fs.open);
-
-
-
-
-/** Promisified version of fs.read. */
-export const read = promisify(fs.read);
-
-
-
-
-/** Promisified version of fs.stat. */
-export const stat = promisify(fs.stat);
-
-
-
-
-/** Promisified version of fs.write. */
-export const write = promisify(fs.write);
-
-
-
 
 /** Creates a date with no local timezone offset. `month` and `day` are 1-based. */
 export function createDate(year: number, month: number, day: number): Date {
