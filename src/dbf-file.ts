@@ -376,12 +376,14 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             break;
 
                         case 'M': // Memo
-                            while (len > 0 && buffer[offset] === 0x20) ++offset, --len;
-                            if (len === 0) { value = null; break; }
                             let blockIndex = dbf._version === 0x30
                                 ? int32At(offset, len)
                                 : parseInt(substrAt(offset, len, encoding));
                             offset += len;
+                            if(isNaN(blockIndex) || blockIndex === 0) {
+                                value = null;
+                                break;
+                            }
 
                             // If the memo file is missing and we get this far, we must be in 'loose' read mode.
                             // Skip reading the memo value and continue with the next field.
