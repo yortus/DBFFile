@@ -391,6 +391,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
 
                             // Start with an empty memo value, and concatenate to it until the memo value is fully read.
                             value = '';
+                            let mergedBuffer = Buffer.from([]);
 
                             // Read the memo data from the memo file. We use a while loop here to read one block-sized
                             // chunk at a time, since memo values can be larger than the block size.
@@ -413,8 +414,11 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                                     // value must be larger than a single block size. In that case, we continue the loop
                                     // and read the next block-sized chunk, and so on until the terminator is found.
                                     let eos = memoBuf.indexOf('\x1A');
-                                    value += iconv.decode(memoBuf.slice(0, eos === -1 ? memoBlockSize : eos), encoding);
-                                    if (eos !== -1) break; // break out of the loop once we've found the terminator.
+                                    mergedBuffer = Buffer.concat([mergedBuffer, memoBuf.slice(0, eos === -1 ? memoBlockSize : eos)]);
+                                    if (eos !== -1) {
+                                        value = iconv.decode(mergedBuffer, encoding);
+                                        break; // break out of the loop once we've found the terminator.
+                                    }
                                 }
 
                                 // Handle first/next block of dBase IV memo data.
@@ -431,9 +435,12 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                                     // Read the chunk of memo data, and break out of the loop when all read.
                                     let skip = isFirstBlockOfMemo ? 8 : 0;
                                     let take = Math.min(len, memoBlockSize - skip);
-                                    value += iconv.decode(memoBuf.slice(skip, skip + take), encoding);
+                                    mergedBuffer = Buffer.concat([mergedBuffer, memoBuf.slice(skip, skip + take)]);
                                     len -= take;
-                                    if (len === 0) break;
+                                    if (len === 0) {
+                                        value = iconv.decode(mergedBuffer, encoding);
+                                        break;
+                                    }
                                 }
 
                                 // Handle first/next block of FoxPro9 memo data.
@@ -450,7 +457,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                                     // 08 - N : Data
 
                                     let skip = 0;
-                                    if (value === '') {
+                                    if (!mergedBuffer.length) {
                                         const memoType = memoBuf.readInt32BE(0);
                                         if (memoType != 1) break;
                                         len = memoBuf.readInt32BE(4);
@@ -459,9 +466,12 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                                     
                                     // Read the chunk of memo data, and break out of the loop when all read.
                                     let take = Math.min(len, memoBlockSize - skip);
-                                    value += iconv.decode(memoBuf.slice(skip, skip + take), encoding);
+                                    mergedBuffer = Buffer.concat([mergedBuffer, memoBuf.slice(skip, skip + take)]);
                                     len -= take;
-                                    if (len === 0) break;
+                                    if (len === 0) {
+                                        value = iconv.decode(mergedBuffer, encoding);
+                                        break;
+                                    }
                                 }
                                 else {
                                     throw new Error(`Reading version ${dbf._version} memo fields is not supported.`);
