@@ -49,6 +49,10 @@ export class DBFFile {
         return appendRecordsToDBF(this, records);
     }
 
+    [Symbol.asyncIterator]() {
+        return iterateRecordsFromDBF(this, Infinity)
+    }
+
     // Private.
     _readMode = 'strict' as 'strict' | 'loose';
     _encoding = '' as Encoding;
@@ -255,8 +259,8 @@ async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateO
 
 
 
-// Private implementation of DBFFile#readRecords
-async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
+// Private implementation of DBFFile#[Symbol.asyncIterator]
+async function* iterateRecordsFromDBF(dbf: DBFFile, maxCount: number) {
     let fd = 0;
     let memoFd = 0;
     try {
@@ -295,12 +299,12 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
         let int32At = (start: number, len: number) => buffer.slice(start, start + len).readInt32LE(0);
 
         // Read records in chunks, until enough records have been read.
-        let records: Array<Record<string, unknown> & {[DELETED]?: true}> = [];
+        let recordsRead = 0;
         while (true) {
 
             // Work out how many records to read in this chunk.
             let maxRecords1 = dbf.recordCount - dbf._recordsRead;
-            let maxRecords2 = maxCount - records.length;
+            let maxRecords2 = maxCount - recordsRead;
             let recordCountToRead = maxRecords1 < maxRecords2 ? maxRecords1 : maxRecords2;
             if (recordCountToRead > recordCountPerBuffer) recordCountToRead = recordCountPerBuffer;
 
@@ -489,13 +493,11 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                 // If the record is marked as deleted, add the `[DELETED]` flag.
                 if (isDeleted) record[DELETED] = true;
 
-                // Add the record to the result.
-                records.push(record);
+                // Yield the record to the caller
+                recordsRead += 1;
+                yield record;
             }
         }
-
-        // Return all the records that were read.
-        return records;
     }
     finally {
         // Close the file(s).
@@ -504,8 +506,14 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
     }
 };
 
-
-
+// Private implementation of DBFFile#readRecords
+async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
+    const records = [];
+    for await (const record of iterateRecordsFromDBF(dbf, maxCount)) {
+        records.push(record);
+    }
+    return records;
+};
 
 // Private implementation of DBFFile#appendRecords
 async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, unknown>>): Promise<DBFFile> {

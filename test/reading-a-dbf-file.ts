@@ -249,4 +249,37 @@ describe('Reading a DBF file', () => {
             expect(undefined).equals(expectedError);
         });
     });
+
+    it('[Symbol.asyncIterator] yields an async generator from which all records can be retrieved', async () => {
+        const [test] = tests;
+        let filepath = path.join(__dirname, `./fixtures/${test.filename}`);
+        let options = test.options;
+        let expectedRecordCount = test.recordCount;
+        let expectedDateOfLastUpdate = test.dateOfLastUpdate;
+        let expectedFirstRecord = test.firstRecord;
+        let expectedLastRecord = test.lastRecord;
+        let expectedDeletedCount = test.deletedCount;
+        let expectedError = test.error;
+
+        let dbf: DBFFile;
+        const records: Array<Record<string, unknown> & {[DELETED]?: true}> = [];
+        try {
+            dbf = await DBFFile.open(filepath, options);
+            for await (const record of dbf) {
+                records.push(record);
+            }
+        }
+        catch (err) {
+            expect(err.message).contains(expectedError ?? '??????');
+            return;
+        }
+        expect(dbf.recordCount, 'the record count should match').equals(expectedRecordCount);
+        expect(dbf.dateOfLastUpdate, 'the date of last update should match').deep.equals(expectedDateOfLastUpdate);
+        expect(records[0], 'first record should match').to.deep.include(expectedFirstRecord!);
+        expect(records[0][DELETED], 'first record should match').equals(expectedFirstRecord![DELETED]);
+        expect(records[records.length - 1], 'last record should match').to.deep.include(expectedLastRecord!);
+        expect(records[records.length - 1][DELETED], 'last record should match').equals(expectedLastRecord![DELETED]);
+        expect(dbf.recordCount - records.length, 'deleted records should match').equals(expectedDeletedCount);
+        expect(undefined).equals(expectedError);
+    })
 });
