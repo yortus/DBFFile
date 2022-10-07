@@ -10,7 +10,7 @@ async function get_records<T>(path: string) {
   return (await dbf.readRecords(dbf.recordCount)) as T[];
 }
 
-describe("Decoding a DBF file with cross-block charactor", () => {
+describe("Decoding a DBF file with cross-block character", () => {
   it("TheGPCRdatabase", async () => {
     const mainfile = await get_records<{
       DOCID: number;
