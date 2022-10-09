@@ -51,6 +51,16 @@ async function testRead() {
     let records = await dbf.readRecords(100);
     for (let record of records) console.log(record);
 }
+
+// or you can utilize for-await-of to read an entire DBF file
+async function streamRead() {
+    let dbf = await DBFFile.open('<full path to .dbf file>');
+    console.log(`DBF file contains ${dbf.recordCount} records.`);
+    console.log(`Field names: ${dbf.fields.map(f => f.name).join(', ')}`);
+    for await (const record of dbf) {
+      console.log(record);
+    }
+}
 ```
 
 ### Example: writing a .dbf file
@@ -120,6 +130,12 @@ class DBFFile {
 
     /** Appends the specified records to this DBF file. */
     appendRecords(records: object[]): Promise<DBFFile>;
+
+    /**
+     * A convenience method that wraps `readRecords`. It returns an async generator which will yield one record at a
+     * time from the DBF database in a memory-friendly manner until all records have been read.
+     */
+    [Symbol.asyncIterator](): AsyncGenerator<object>;
 }
 
 /** Metadata describing a single field in a DBF file. */

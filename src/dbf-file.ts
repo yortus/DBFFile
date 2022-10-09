@@ -49,6 +49,12 @@ export class DBFFile {
         return appendRecordsToDBF(this, records);
     }
 
+    async *[Symbol.asyncIterator]() {
+        while (this._recordsRead !== this.recordCount) {
+            yield* await this.readRecords(1000)
+        }
+    }
+
     // Private.
     _readMode = 'strict' as 'strict' | 'loose';
     _encoding = '' as Encoding;
