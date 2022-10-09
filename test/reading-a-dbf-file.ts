@@ -251,7 +251,7 @@ describe('Reading a DBF file', () => {
     });
 
     tests.forEach(test => {
-        it(`asyncIterator: ${test.description} ()`, async () => {
+        it(`asyncIterator: ${test.description}`, async () => {
           let filepath = path.join(__dirname, `./fixtures/${test.filename}`);
           let options = test.options;
           let expectedRecordCount = test.recordCount;
