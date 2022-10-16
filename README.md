@@ -21,6 +21,7 @@ Read and write .dbf (dBase III and Visual FoxPro) files in Node.js:
   - Can access all field descriptors
   - Can access total record count
   - Can access date of last update
+  - Can read records using async iteration
   - Can read records in arbitrary-sized batches
   - Can include deleted records in results
   - Supports very large files
@@ -39,27 +40,30 @@ Read and write .dbf (dBase III and Visual FoxPro) files in Node.js:
 
 `npm install dbffile` or `yarn add dbffile`
 
-### Example: reading a .dbf file
+### Example: read all records in a .dbf file using for-await-of
 
 ```javascript
 import {DBFFile} from 'dbffile';
 
-async function testRead() {
+async function iterativeRead() {
     let dbf = await DBFFile.open('<full path to .dbf file>');
     console.log(`DBF file contains ${dbf.recordCount} records.`);
     console.log(`Field names: ${dbf.fields.map(f => f.name).join(', ')}`);
-    let records = await dbf.readRecords(100);
-    for (let record of records) console.log(record);
+    for await (const record of dbf) console.log(record);
 }
+```
 
-// or you can utilize for-await-of to read an entire DBF file
-async function streamRead() {
+### Example: reading a batch of records from a .dbf file
+
+```javascript
+import {DBFFile} from 'dbffile';
+
+async function batchRead() {
     let dbf = await DBFFile.open('<full path to .dbf file>');
     console.log(`DBF file contains ${dbf.recordCount} records.`);
     console.log(`Field names: ${dbf.fields.map(f => f.name).join(', ')}`);
-    for await (const record of dbf) {
-      console.log(record);
-    }
+    let records = await dbf.readRecords(100); // batch-reads up to 100 records, returned as an array
+    for (let record of records) console.log(record);
 }
 ```
 
@@ -68,7 +72,7 @@ async function streamRead() {
 ```javascript
 import {DBFFile} from 'dbffile';
 
-async function testWrite() {
+async function batchWrite() {
     let fieldDescriptors = [
         { name: 'fname', type: 'C', size: 255 },
         { name: 'lname', type: 'C', size: 255 }
@@ -131,10 +135,7 @@ class DBFFile {
     /** Appends the specified records to this DBF file. */
     appendRecords(records: object[]): Promise<DBFFile>;
 
-    /**
-     * A convenience method that wraps `readRecords`. It returns an async generator which will yield one record at a
-     * time from the DBF database in a memory-friendly manner until all records have been read.
-     */
+    /** Iterates over each record in this DBF file. */
     [Symbol.asyncIterator](): AsyncGenerator<object>;
 }
 
