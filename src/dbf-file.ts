@@ -51,7 +51,7 @@ export class DBFFile {
 
     async *[Symbol.asyncIterator]() {
         while (this._recordsRead !== this.recordCount) {
-            yield* await this.readRecords(1000)
+            yield* await this.readRecords(1000);
         }
     }
 
