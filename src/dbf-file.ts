@@ -49,6 +49,17 @@ export class DBFFile {
         return appendRecordsToDBF(this, records);
     }
 
+    /**
+     * Iterates over each record in this DBF file. If the `includeDeletedRecords` option is set, then deleted records
+     * are yielded, otherwise they are skipped. Deleted records have the property `[DELETED]: true`, using the `DELETED`
+     * symbol exported from this library.
+     */
+     async *[Symbol.asyncIterator]() {
+        while (this._recordsRead !== this.recordCount) {
+            yield* await this.readRecords(1000);
+        }
+    }
+
     // Private.
     _readMode = 'strict' as 'strict' | 'loose';
     _encoding = '' as Encoding;
