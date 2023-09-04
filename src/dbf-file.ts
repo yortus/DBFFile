@@ -133,11 +133,24 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
 
         // Parse and validate all field descriptors. Skip validation if reading in 'loose' mode.
         let fields: FieldDescriptor[] = [];
+        let encoding = 'ISO-8859-1';
+
+        switch (typeof options.encoding) {
+            case 'string':
+                encoding = options.encoding;
+                break;
+            case 'object':
+                encoding = options.encoding.default
+                break;
+            default:
+                break;
+        }
+
         while (headerLength > 32 + fields.length * 32) {
             await read(fd, buffer, 0, 32, 32 + fields.length * 32);
             if (buffer.readUInt8(0) === 0x0D) break;
             let field: FieldDescriptor = {
-                name: iconv.decode(buffer.slice(0, 10), 'ISO-8859-1').split('\0')[0],
+                name: iconv.decode(buffer.slice(0, 10), encoding).split('\0')[0],
                 type: String.fromCharCode(buffer[0x0B]) as FieldDescriptor['type'],
                 size: buffer.readUInt8(0x10),
                 decimalPlaces: buffer.readUInt8(0x11)
