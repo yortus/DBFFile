@@ -133,7 +133,7 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
 
         // Parse and validate all field descriptors. Skip validation if reading in 'loose' mode.
         let fields: FieldDescriptor[] = [];
-        let encoding = getEncoding(options.encoding);
+        const encoding = getEncoding(options.encoding);
         while (headerLength > 32 + fields.length * 32) {
             await read(fd, buffer, 0, 32, 32 + fields.length * 32);
             if (buffer.readUInt8(0) === 0x0D) break;
@@ -219,9 +219,10 @@ async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateO
         await write(fd, buffer, 0, 32, 0);
 
         // Write the field descriptors.
+        const encoding = getEncoding(options.encoding);
         for (let i = 0; i < fields.length; ++i) {
             let {name, type, size, decimalPlaces} = fields[i];
-            iconv.encode(name, 'ISO-8859-1').copy(buffer, 0);       // Field name (up to 10 chars)
+            iconv.encode(name, encoding).copy(buffer, 0);           // Field name (up to 10 chars)
             for (let j = name.length; j < 11; ++j) {                // null terminator(s)
                 buffer.writeUInt8(0, j);
             }
