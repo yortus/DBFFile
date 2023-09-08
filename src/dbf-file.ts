@@ -133,19 +133,7 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
 
         // Parse and validate all field descriptors. Skip validation if reading in 'loose' mode.
         let fields: FieldDescriptor[] = [];
-        let encoding = 'ISO-8859-1';
-
-        switch (typeof options.encoding) {
-            case 'string':
-                encoding = options.encoding;
-                break;
-            case 'object':
-                encoding = options.encoding.default
-                break;
-            default:
-                break;
-        }
-
+        let encoding = getEncoding(options.encoding);
         while (headerLength > 32 + fields.length * 32) {
             await read(fd, buffer, 0, 32, 32 + fields.length * 32);
             if (buffer.readUInt8(0) === 0x0D) break;
@@ -350,7 +338,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                     let field = dbf.fields[j];
                     let len = field.size;
                     let value: any = null;
-                    let encoding = getEncodingForField(field, dbf._encoding);
+                    let encoding = getEncoding(dbf._encoding, field);
 
                     // Decode the field from the buffer, according to its type.
                     switch (field.type) {
@@ -569,7 +557,7 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
                 let field = dbf.fields[j];
                 let value: any = record[field.name];
                 if (value === null || typeof value === 'undefined') value = '';
-                let encoding = getEncodingForField(field, dbf._encoding);
+                let encoding = getEncoding(dbf._encoding, field);
 
                 // Encode the field in the buffer, according to its type.
                 switch (field.type) {
@@ -706,7 +694,7 @@ function calculateRecordLengthInBytes(fields: FieldDescriptor[]): number {
 
 
 // Private helper function
-function getEncodingForField(field: FieldDescriptor, encoding: Encoding) {
+function getEncoding(encoding: Encoding, field?: FieldDescriptor) {
     if (typeof encoding === 'string') return encoding;
-    return encoding[field.name] || encoding.default;
+    return encoding[field?.name ?? 'default'] || encoding.default;
 }
