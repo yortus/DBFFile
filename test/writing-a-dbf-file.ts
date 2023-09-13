@@ -187,6 +187,15 @@ describe('Writing a DBF file', () => {
             newRecord: record => ({...record, FIELD1: null, FIELD3: null, FIELD4: null, FIELD6: null}),
             firstRecord: {FIELD1: '', FIELD3: null, FIELD4: null, FIELD6: null},
         },
+        {
+            description: `DBF with non latin-1 headersl`,
+            filename: 'dbase_not_latin1.dbf',
+            options: {encoding: 'big5'},
+            recordCount: 1,
+            newFields: [],
+            newRecord: record => record,
+            firstRecord: {畜主姓名: '徐', 電話: '292', 地址: '台北縣永和', 微晶片號碼: '00013', 狂犬病牌號: '87A', 犬名: '小小', 品種: '約克夏', 性別: '公', 出生日期: new Date('1991-04-16'), 登入日期: new Date('1998-04-28')},
+        },
     ];
 
     rimraf.sync(path.join(__dirname, `./fixtures/*.out`));
