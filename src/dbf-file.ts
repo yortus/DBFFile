@@ -222,10 +222,8 @@ async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateO
         const encoding = getEncoding(options.encoding);
         for (let i = 0; i < fields.length; ++i) {
             let {name, type, size, decimalPlaces} = fields[i];
-            iconv.encode(name, encoding).copy(buffer, 0);           // Field name (up to 10 chars)
-            for (let j = name.length; j < 11; ++j) {                // null terminator(s)
-                buffer.writeUInt8(0, j);
-            }
+            const l = iconv.encode(name, encoding).copy(buffer, 0); // Field name (up to 10 bytes)
+            for (let j = l; j < 11; ++j) buffer.writeUInt8(0, j);   // Field name null terminator(s)
             buffer.writeUInt8(type.charCodeAt(0), 0x0B);            // Field type
             buffer.writeUInt32LE(0, 0x0C);                          // Field data address (set to zero)
             buffer.writeUInt8(size, 0x10);                          // Field length
