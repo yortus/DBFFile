@@ -133,11 +133,12 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
 
         // Parse and validate all field descriptors. Skip validation if reading in 'loose' mode.
         let fields: FieldDescriptor[] = [];
+        const encoding = getEncoding(options.encoding);
         while (headerLength > 32 + fields.length * 32) {
             await read(fd, buffer, 0, 32, 32 + fields.length * 32);
             if (buffer.readUInt8(0) === 0x0D) break;
             let field: FieldDescriptor = {
-                name: iconv.decode(buffer.slice(0, 10), 'ISO-8859-1').split('\0')[0],
+                name: iconv.decode(buffer.slice(0, 10), encoding).split('\0')[0],
                 type: String.fromCharCode(buffer[0x0B]) as FieldDescriptor['type'],
                 size: buffer.readUInt8(0x10),
                 decimalPlaces: buffer.readUInt8(0x11)
@@ -218,12 +219,11 @@ async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateO
         await write(fd, buffer, 0, 32, 0);
 
         // Write the field descriptors.
+        const encoding = getEncoding(options.encoding);
         for (let i = 0; i < fields.length; ++i) {
             let {name, type, size, decimalPlaces} = fields[i];
-            iconv.encode(name, 'ISO-8859-1').copy(buffer, 0);       // Field name (up to 10 chars)
-            for (let j = name.length; j < 11; ++j) {                // null terminator(s)
-                buffer.writeUInt8(0, j);
-            }
+            const l = iconv.encode(name, encoding).copy(buffer, 0); // Field name (up to 10 bytes)
+            for (let j = l; j < 11; ++j) buffer.writeUInt8(0, j);   // Field name null terminator(s)
             buffer.writeUInt8(type.charCodeAt(0), 0x0B);            // Field type
             buffer.writeUInt32LE(0, 0x0C);                          // Field data address (set to zero)
             buffer.writeUInt8(size, 0x10);                          // Field length
@@ -337,7 +337,7 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                     let field = dbf.fields[j];
                     let len = field.size;
                     let value: any = null;
-                    let encoding = getEncodingForField(field, dbf._encoding);
+                    let encoding = getEncoding(dbf._encoding, field);
 
                     // Decode the field from the buffer, according to its type.
                     switch (field.type) {
@@ -556,7 +556,7 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
                 let field = dbf.fields[j];
                 let value: any = record[field.name];
                 if (value === null || typeof value === 'undefined') value = '';
-                let encoding = getEncodingForField(field, dbf._encoding);
+                let encoding = getEncoding(dbf._encoding, field);
 
                 // Encode the field in the buffer, according to its type.
                 switch (field.type) {
@@ -693,7 +693,7 @@ function calculateRecordLengthInBytes(fields: FieldDescriptor[]): number {
 
 
 // Private helper function
-function getEncodingForField(field: FieldDescriptor, encoding: Encoding) {
+function getEncoding(encoding: Encoding, field?: FieldDescriptor) {
     if (typeof encoding === 'string') return encoding;
-    return encoding[field.name] || encoding.default;
+    return encoding[field?.name ?? 'default'] || encoding.default;
 }

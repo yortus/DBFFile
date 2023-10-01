@@ -238,6 +238,16 @@ describe('Reading a DBF file', () => {
             },
             deletedCount: 4234,
         },
+        {
+            description: 'DBF with deleted records included in results and non latin-1 headers',
+            filename: 'dbase_not_latin1.dbf',
+            options: {includeDeletedRecords: true, encoding: 'big5'},
+            recordCount: 2,
+            dateOfLastUpdate: new Date('1998-09-13'),
+            firstRecord: {畜主姓名: '徐', 電話: '292', 地址: '台北縣永和', 微晶片號碼: '00013', 狂犬病牌號: '87A', 犬名: '小小', 品種: '約克夏', 性別: '公', 出生日期: new Date('1991-04-16'), 登入日期: new Date('1998-04-28')},
+            lastRecord: {[DELETED]: true, 畜主姓名: 'Chen', 電話: '0123456789', 地址: 'Fake address', 微晶片號碼: '000000', 狂犬病牌號: '000000', 犬名: 'Dog', 品種: 'Dog', 性別: '母', 出生日期: new Date('2023-09-13'), 登入日期: new Date('2023-09-13')},
+            deletedCount: 0,
+        },
     ];
 
     tests.forEach(test => {
