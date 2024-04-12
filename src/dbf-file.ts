@@ -579,8 +579,8 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
 
                     case 'N': // Number
                     case 'F': // Float - appears to be treated identically to Number
-                        value = field.decimalPlaces ? value.toFixed(field.decimalPlaces) : value.toString();
-                        value = value.slice(0, -field.size);
+                        value = value.toString();
+                        value = value.slice(0, field.size);
                         while (value.length < field.size) value = ' ' + value;
                         iconv.encode(value, encoding).copy(buffer, offset, 0, field.size);
                         offset += field.size;
