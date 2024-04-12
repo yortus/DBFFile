@@ -681,7 +681,7 @@ function validateRecord(fields: FieldDescriptor[], record: Record<string, unknow
             if (typeof value !== 'string') throw new Error(`${name}: expected a string`);
             if (value.length > 255) throw new Error(`${name}: text is too long (maximum length is 255 chars)`);
         }
-        else if (type === 'N' || type === 'F' || type === 'I') {
+        else if (type === 'N' || type === 'F' || type === 'I' || type === 'Y') {
             if (typeof value !== 'number') throw new Error(`${name}: expected a number`);
         }
         else if (type === 'D') {

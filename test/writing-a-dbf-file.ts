@@ -63,6 +63,14 @@ describe('Writing a DBF file', () => {
             firstRecord: {Circular_D: '12', Condition: 'Good', Northing: 557904.898, FLOAT1: 5.57905e2},
         },
         {
+            description: `DBF with an 'Y' (currency) field`,
+            filename: 'dbase_currency.dbf',
+            recordCount: 2,
+            newFields: [], // [{ name: 'TEST', type: 'Y', size: 10, decimalPlaces: 3}],
+            newRecord: record => ({ ...record}), //, TEST: (record.UP as number) * 10}),
+            firstRecord: { UP: 350.0000 },
+        },
+        {
             description: `DBF with memo file (version 0x83)`,
             filename: 'dbase_83.dbf',
             recordCount: 0,

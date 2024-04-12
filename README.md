@@ -149,7 +149,7 @@ interface FieldDescriptor {
      * The single-letter code for the field type.
      * C=string, N=numeric, F=float, I=integer, L=logical, D=date, M=memo.
      */
-    type: 'C' | 'N' | 'F' | 'L' | 'D' | 'I' | 'M' | 'T' | 'B';
+    type: 'C' | 'N' | 'F' | 'Y' | 'L' | 'D' | 'I' | 'M' | 'T' | 'B';
 
     /** The size of the field in bytes. */
     size: number;
