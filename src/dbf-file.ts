@@ -353,6 +353,14 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             value = len > 0 ? parseFloat(substrAt(offset, len, encoding)) : null;
                             offset += len;
                             break;
+                        
+                        case 'Y': // Currency
+                            value = buffer.readInt32LE(offset);
+                            if (field.decimalPlaces) {
+                                value = value / Math.pow(10, field.decimalPlaces);
+                            }
+                            offset += field.size;
+                            break;
 
                         case 'L': // Boolean
                             let c = String.fromCharCode(buffer[offset++]);
@@ -575,6 +583,12 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
                         value = value.slice(0, field.size);
                         while (value.length < field.size) value = ' ' + value;
                         iconv.encode(value, encoding).copy(buffer, offset, 0, field.size);
+                        offset += field.size;
+                        break;
+                    
+                    case 'Y': // Currency
+                        value = value * (field.decimalPlaces ? Math.pow(10, field.decimalPlaces) : 1);
+                        buffer.writeInt32LE(value, offset);
                         offset += field.size;
                         break;
 
