@@ -66,9 +66,9 @@ describe('Writing a DBF file', () => {
             description: `DBF with an 'Y' (currency) field`,
             filename: 'dbase_currency.dbf',
             recordCount: 2,
-            newFields: [], // [{ name: 'TEST', type: 'Y', size: 10, decimalPlaces: 3}],
-            newRecord: record => ({ ...record}), //, TEST: (record.UP as number) * 10}),
-            firstRecord: { UP: 350.0000 },
+            newFields: [{ name: 'TEST1', type: 'Y', size: 8}, { name: 'TEST2', type: 'Y', size: 8}],
+            newRecord: record => ({ ...record, TEST1: -1234.56789, TEST2: 5000005.7}),
+            firstRecord: { UP: 350.0000, TEST1: -1234.5679, TEST2: 5000005.7000 },
         },
         {
             description: `DBF with memo file (version 0x83)`,
@@ -132,7 +132,7 @@ describe('Writing a DBF file', () => {
             newFields: [],
             newRecord: record => record,
             firstRecord: {},
-            error: `Type 'Y' is not supported`,
+            error: `Type '0' is not supported`,
         },
         {
             description: `DBF with invalid field value (string type mismatch)`,

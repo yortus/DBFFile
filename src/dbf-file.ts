@@ -355,10 +355,9 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             break;
                         
                         case 'Y': // Currency
-                            value = buffer.readInt32LE(offset);
-                            if (field.decimalPlaces) {
-                                value = value / Math.pow(10, field.decimalPlaces);
-                            }
+                            // NB: Some precision may be lost here, since JS can't represent all 64 bit ints accurately
+                            value = buffer.readBigInt64LE(offset);
+                            value = Number(value) / 10_000;
                             offset += field.size;
                             break;
 
@@ -587,8 +586,9 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
                         break;
                     
                     case 'Y': // Currency
-                        value = value * (field.decimalPlaces ? Math.pow(10, field.decimalPlaces) : 1);
-                        buffer.writeInt32LE(value, offset);
+                        // NB: Some precision may be lost here, since JS can't represent all 64 bit ints accurately
+                        value = Math.round(value * 10_000);
+                        buffer.writeBigInt64LE(BigInt(value), offset);
                         offset += field.size;
                         break;
 
