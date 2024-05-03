@@ -353,6 +353,13 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             value = len > 0 ? parseFloat(substrAt(offset, len, encoding)) : null;
                             offset += len;
                             break;
+                        
+                        case 'Y': // Currency
+                            // NB: Some precision may be lost here, since JS can't represent all 64 bit ints accurately
+                            value = buffer.readBigInt64LE(offset);
+                            value = Number(value) / 10_000;
+                            offset += field.size;
+                            break;
 
                         case 'L': // Boolean
                             let c = String.fromCharCode(buffer[offset++]);
@@ -577,6 +584,13 @@ async function appendRecordsToDBF(dbf: DBFFile, records: Array<Record<string, un
                         iconv.encode(value, encoding).copy(buffer, offset, 0, field.size);
                         offset += field.size;
                         break;
+                    
+                    case 'Y': // Currency
+                        // NB: Some precision may be lost here, since JS can't represent all 64 bit ints accurately
+                        value = Math.round(value * 10_000);
+                        buffer.writeBigInt64LE(BigInt(value), offset);
+                        offset += field.size;
+                        break;
 
                     case 'L': // Boolean
                         buffer.writeUInt8(value === '' ? 0x20 : value ? 0x54/* 'T' */ : 0x46/* 'F' */, offset++);
@@ -667,7 +681,7 @@ function validateRecord(fields: FieldDescriptor[], record: Record<string, unknow
             if (typeof value !== 'string') throw new Error(`${name}: expected a string`);
             if (value.length > 255) throw new Error(`${name}: text is too long (maximum length is 255 chars)`);
         }
-        else if (type === 'N' || type === 'F' || type === 'I') {
+        else if (type === 'N' || type === 'F' || type === 'I' || type === 'Y') {
             if (typeof value !== 'number') throw new Error(`${name}: expected a number`);
         }
         else if (type === 'D') {

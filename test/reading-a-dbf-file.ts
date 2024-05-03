@@ -248,6 +248,29 @@ describe('Reading a DBF file', () => {
             lastRecord: {[DELETED]: true, 畜主姓名: 'Chen', 電話: '0123456789', 地址: 'Fake address', 微晶片號碼: '000000', 狂犬病牌號: '000000', 犬名: 'Dog', 品種: 'Dog', 性別: '母', 出生日期: new Date('2023-09-13'), 登入日期: new Date('2023-09-13')},
             deletedCount: 0,
         },
+        {
+            description: 'DBF with currency field type (\'Y\')',
+            filename: 'dbase_currency.dbf',
+            recordCount: 2,
+            firstRecord: {
+                HCODE: '43659',
+                LCCODE: '6505-003-0001',
+                STDCODE: '1033097',
+                UP: 350.0000,
+                DATEBEG: new Date('2023-05-13'),
+                DATEEND: new Date('9999-12-31'),
+            },
+            lastRecord: {
+                HCODE: '43659',
+                LCCODE: '6505-003-0002',
+                STDCODE: '690439',
+                UP: 560.0000,
+                DATEBEG: new Date('2023-05-17'),
+                DATEEND: new Date('9999-12-31'),
+            },
+            dateOfLastUpdate: new Date('1924-04-10'),
+            deletedCount: 0
+        }
     ];
 
     tests.forEach(test => {

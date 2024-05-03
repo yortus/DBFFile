@@ -6,9 +6,9 @@ export interface FieldDescriptor {
 
     /**
      * The single-letter code for the field type.
-     * C=string, N=numeric, F=float, L=logical, D=date, I=integer, M=memo, T=datetime, B=double.
+     * C=string, N=numeric, F=float, Y=currency, L=logical, D=date, I=integer, M=memo, T=datetime, B=double.
      */
-    type: 'C' | 'N' | 'F' | 'L' | 'D' | 'I' | 'M' | 'T' | 'B';
+    type: 'C' | 'N' | 'F' | 'Y' | 'L' | 'D' | 'I' | 'M' | 'T' | 'B';
 
     /** The size of the field in bytes. */
     size: number;
@@ -39,6 +39,7 @@ export function validateFieldDescriptor(field: FieldDescriptor, fileVersion: num
     if (type === 'C' && size > 255) throw new Error('Field size is too large (maximum is 255)');
     if (type === 'N' && size > 20) throw new Error('Field size is too large (maximum is 20)');
     if (type === 'F' && size > 20) throw new Error('Field size is too large (maximum is 20)');
+    if (type === 'Y' && size !== 8) throw new Error('Invalid field size (must be 8)');
     if (type === 'L' && size !== 1) throw new Error('Invalid field size (must be 1)');
     if (type === 'D' && size !== 8) throw new Error('Invalid field size (must be 8)');
     if (type === 'M' && size !== memoSize) throw new Error(`Invalid field size (must be ${memoSize})`);
@@ -54,4 +55,4 @@ export function validateFieldDescriptor(field: FieldDescriptor, fileVersion: num
 
 
 
-const FieldTypes: Array<FieldDescriptor['type']> = ['C', 'N', 'F', 'L', 'D', 'I', 'M', 'T', 'B'];
+const FieldTypes: Array<FieldDescriptor['type']> = ['C', 'N', 'F', 'Y', 'L', 'D', 'I', 'M', 'T', 'B'];
