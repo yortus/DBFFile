@@ -8,6 +8,7 @@ Read and write .dbf (dBase III and Visual FoxPro) files in Node.js:
   - `C` (string)
   - `N` (numeric)
   - `F` (float)
+  - `Y` (currency)
   - `I` (integer)
   - `L` (logical)
   - `D` (date)
