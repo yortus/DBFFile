@@ -294,7 +294,14 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                 await read(memoFd, buffer, 0, 4, 4);
                 memoBlockSize = (dbf._version === 0x8b ? buffer.readInt32LE(0) : 0) || 512;
             }
-            memoBuf = Buffer.alloc(memoBlockSize);
+            if (memoBlockSize > 1) {
+                memoBuf = Buffer.alloc(memoBlockSize);
+            } else if (memoBlockSize == 1 && dbf._version === 0x30) {
+                // FoxPro9 memos can have a block size of 1, which is a special case
+                // All of the field is in one block. 
+                // Allocate 8 bytes for header and resize afterwards
+                memoBuf = Buffer.alloc(8);
+            }
             memoFileSize = (await stat(dbf._memoPath)).size;
         }
 
@@ -415,8 +422,31 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             // chunk at a time, since memo values can be larger than the block size.
                             while (true) {
 
-                                // Read the next block-sized chunk from the memo file.
-                                await read(memoFd, memoBuf, 0, memoBlockSize, blockIndex * memoBlockSize);
+                                if (memoBlockSize > 1) {
+                                    // Read the next block-sized chunk from the memo file.
+                                    await read(memoFd,memoBuf,0,memoBlockSize,blockIndex * memoBlockSize);
+                                } else if (memoBlockSize == 1 && dbf._version === 0x30) {
+                                    // FoxPro9 and has blockSize 1, which means the full message is in one block (variable block length)
+                                    // reset the buffer, just in case it was resized in a previous iteration to less than 8
+                                    memoBuf = Buffer.alloc(8);
+
+                                    // get the header, no need to multiply by size as it is 1
+                                    await read(memoFd, memoBuf, 0, 8, blockIndex);
+
+                                    // get memotType as normal
+                                    const memoType = memoBuf.readInt32BE(0);
+                                    if (memoType != 1) break;
+
+                                    // get length as normal
+                                    len = memoBuf.readInt32BE(4);
+
+                                    // reallocate the buffer for len of the whole message
+                                    memoBuf = Buffer.alloc(len);
+
+                                    // read the whole message without the header
+                                    await read(memoFd, memoBuf, 0, len, blockIndex + 8);
+                                }
+
 
                                 // Handle first/next block of dBase III memo data.
                                 if (dbf._version === 0x83) {
@@ -475,19 +505,27 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                                     // 08 - N : Data
 
                                     let skip = 0;
-                                    if (!mergedBuffer.length) {
+                                    // If memoBloSize is normal
+                                    if (!mergedBuffer.length && memoBlockSize > 1) {
                                         const memoType = memoBuf.readInt32BE(0);
                                         if (memoType != 1) break;
                                         len = memoBuf.readInt32BE(4);
                                         skip = 8;
                                     }
-                                    
-                                    // Read the chunk of memo data, and break out of the loop when all read.
-                                    let take = Math.min(len, memoBlockSize - skip);
-                                    mergedBuffer = Buffer.concat([mergedBuffer, memoBuf.slice(skip, skip + take)]);
-                                    len -= take;
-                                    if (len === 0) {
-                                        value = iconv.decode(mergedBuffer, encoding);
+
+                                    if (memoBlockSize > 1) {
+                                        // Read the chunk of memo data, and break out of the loop when all read.
+                                        let take = Math.min(len, memoBlockSize - skip);
+                                        mergedBuffer = Buffer.concat([mergedBuffer, memoBuf.slice(skip, skip + take)]);
+                                        len -= take;
+                                        if (len === 0) {
+                                            value = iconv.decode(mergedBuffer, encoding);
+                                            break;
+                                        }
+                                    } else if (memoBlockSize == 1) {
+                                        // if memoBlockSize is 1, it is variable length blockSize. 
+                                        // The whole message has been loaded into memoBuf, now only decode it
+                                        value = iconv.decode(memoBuf, encoding);
                                         break;
                                     }
                                 }
