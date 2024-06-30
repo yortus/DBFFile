@@ -279,17 +279,19 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
 
         // If there is a memo file, open it and get the block size. Also get the total file size for overflow checking.
         // The code below assumes the block size is at offset 4 in the .dbt for dBase IV files, and defaults to 512 if
-        // all zeros. For dBase III files, the block size is always 512 bytes.
+        // all zeros. For dBase III files, the block size is always 512 bytes. For VFP9 the block size is at offset 6.
+        // VFP9 memos can have a block size of 1, a special case where each block is sized to fit its value.
         let memoBlockSize = 0;
         let memoFileSize = 0;
         let memoBuf: Buffer | undefined;
         if (dbf._memoPath) {
             memoFd = await open(dbf._memoPath, 'r');
             if (dbf._version === 0x30) {
-                // FoxPro9 
+                // VFP9 
                 await read(memoFd, buffer, 0, 2, 6);
                 memoBlockSize = buffer.readUInt16BE(0) || 512;
-            } else {
+            }
+            else {
                 // dBASE
                 await read(memoFd, buffer, 0, 4, 4);
                 memoBlockSize = (dbf._version === 0x8b ? buffer.readInt32LE(0) : 0) || 512;
@@ -414,9 +416,21 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                             // Read the memo data from the memo file. We use a while loop here to read one block-sized
                             // chunk at a time, since memo values can be larger than the block size.
                             while (true) {
+                                if (memoBlockSize > 1) {
+                                    // Read the next block-sized chunk from the memo file.
+                                    await read(memoFd, memoBuf, 0, memoBlockSize, blockIndex * memoBlockSize);
+                                }
+                                else {
+                                    // VFP9 with block size 1. This means the block size is variable to fit each value.
+                                    // Read the memo length from the block header.
+                                    memoBuf = memoBuf.length >= 4 ? memoBuf : Buffer.alloc(4);
+                                    await read(memoFd, memoBuf, 0, 4, blockIndex + 4);
+                                    len = memoBuf.readInt32BE(0);
 
-                                // Read the next block-sized chunk from the memo file.
-                                await read(memoFd, memoBuf, 0, memoBlockSize, blockIndex * memoBlockSize);
+                                    // read the entire memo value (without the header).
+                                    memoBuf = Buffer.alloc(len);
+                                    await read(memoFd, memoBuf, 0, len, blockIndex + 8);
+                                }
 
                                 // Handle first/next block of dBase III memo data.
                                 if (dbf._version === 0x83) {
@@ -475,13 +489,19 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
                                     // 08 - N : Data
 
                                     let skip = 0;
+                                    if (memoBlockSize == 1) {
+                                        // For VFP9 with block size 1, the entire memo value is in memoBuf.
+                                        value = iconv.decode(memoBuf, encoding);
+                                        break;
+                                    }
+
                                     if (!mergedBuffer.length) {
                                         const memoType = memoBuf.readInt32BE(0);
                                         if (memoType != 1) break;
                                         len = memoBuf.readInt32BE(4);
                                         skip = 8;
                                     }
-                                    
+
                                     // Read the chunk of memo data, and break out of the loop when all read.
                                     let take = Math.min(len, memoBlockSize - skip);
                                     mergedBuffer = Buffer.concat([mergedBuffer, memoBuf.slice(skip, skip + take)]);

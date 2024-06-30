@@ -9,3 +9,5 @@ For information about the dBase III (.dbf) file format, see:
 
 For test files, see:
 - https://github.com/infused/dbf/tree/master/spec/fixtures
+
+For details about Visual FoxPro 9 memo fields with block size 1, see [this article](./vfp9-bs1.pdf)
