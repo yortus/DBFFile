@@ -270,7 +270,22 @@ describe('Reading a DBF file', () => {
             },
             dateOfLastUpdate: new Date('1924-04-10'),
             deletedCount: 0
-        }
+        },
+        {
+            description: 'VFP9 DBF with memo file with block size 1 (version 0x30)',
+            filename: 'vfp9_memo_bs1.dbf',
+            recordCount: 5,
+            dateOfLastUpdate: new Date('1924-06-30'),
+            firstRecord: {
+                CODE: 'a1',
+                NOTES: 'Some notes here\r\n',
+            },
+            lastRecord: {
+                CODE: 'b3',
+                NOTES: ' ',
+            },
+            deletedCount: 0,
+        },
     ];
 
     tests.forEach(test => {
@@ -295,6 +310,7 @@ describe('Reading a DBF file', () => {
                 expect(err.message).contains(expectedError ?? '??????');
                 return;
             }
+
             expect(dbf.recordCount, 'the record count should match').equals(expectedRecordCount);
             expect(dbf.dateOfLastUpdate, 'the date of last update should match').deep.equals(expectedDateOfLastUpdate);
             expect(records[0], 'first record should match').to.deep.include(expectedFirstRecord!);
