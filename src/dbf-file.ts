@@ -35,6 +35,9 @@ export class DBFFile {
     /** Metadata for all fields defined in the DBF file. */
     fields = [] as FieldDescriptor[];
 
+    /** The language driver ID */
+    languageDriverId = 0;
+
     /**
      * Reads a subset of records from this DBF file. If the `includeDeletedRecords` option is set, then deleted records
      * are included in the results, otherwise they are skipped. Deleted records have the property `[DELETED]: true`,
@@ -82,23 +85,24 @@ export const DELETED = Symbol();
 
 //-------------------- Private implementation starts here --------------------
 async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
-    let options = normaliseOpenOptions(opts);
+    const options = normaliseOpenOptions(opts);
     let fd = 0;
     try {
         // Open the file and create a buffer to read through.
         fd = await open(path, 'r');
-        let buffer = Buffer.alloc(32);
+        const buffer = Buffer.alloc(32);
 
         // Read various properties from the header record.
         await read(fd, buffer, 0, 32, 0);
-        let fileVersion = buffer.readUInt8(0);
-        let lastUpdateY = buffer.readUInt8(1); // number of years after 1900
-        let lastUpdateM = buffer.readUInt8(2); // 1-based
-        let lastUpdateD = buffer.readUInt8(3); // 1-based
+        const fileVersion = buffer.readUInt8(0);
+        const lastUpdateY = buffer.readUInt8(1); // number of years after 1900
+        const lastUpdateM = buffer.readUInt8(2); // 1-based
+        const lastUpdateD = buffer.readUInt8(3); // 1-based
         const dateOfLastUpdate = createDate(lastUpdateY + 1900, lastUpdateM, lastUpdateD);
-        let recordCount = buffer.readInt32LE(4);
-        let headerLength = buffer.readInt16LE(8);
+        const recordCount = buffer.readInt32LE(4);
+        const headerLength = buffer.readInt16LE(8);
         let recordLength = buffer.readInt16LE(10);
+        const languageDriverId = buffer.readInt8(0x1D);        
         let memoPath: string | undefined;
 
         // Validate the file version. Skip validation if reading in 'loose' mode.
@@ -133,12 +137,12 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
         }
 
         // Parse and validate all field descriptors. Skip validation if reading in 'loose' mode.
-        let fields: FieldDescriptor[] = [];
+        const fields: FieldDescriptor[] = [];
         const encoding = getEncoding(options.encoding);
         while (headerLength > 32 + fields.length * 32) {
             await read(fd, buffer, 0, 32, 32 + fields.length * 32);
             if (buffer.readUInt8(0) === 0x0D) break;
-            let field: FieldDescriptor = {
+            const field: FieldDescriptor = {
                 name: iconv.decode(buffer.slice(0, 10), encoding).split('\0')[0],
                 type: String.fromCharCode(buffer[0x0B]) as FieldDescriptor['type'],
                 size: buffer.readUInt8(0x10),
@@ -161,11 +165,12 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
         assert(recordLength === computedRecordLength, 'Invalid DBF: Incorrect record length');
 
         // Return a new DBFFile instance.
-        let result = new DBFFile();
+        const result = new DBFFile();
         result.path = path;
         result.recordCount = recordCount;
         result.dateOfLastUpdate = dateOfLastUpdate;
         result.fields = fields;
+        result.languageDriverId = languageDriverId;
         result._readMode = options.readMode;
         result._encoding = options.encoding;
         result._includeDeletedRecords = options.includeDeletedRecords;
@@ -186,11 +191,11 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
 
 
 async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateOptions): Promise<DBFFile> {
-    let options = normaliseCreateOptions(opts);
+    const options = normaliseCreateOptions(opts);
     let fd = 0;
     try {
         // Validate the field metadata.
-        let fileVersion = options.fileVersion;
+        const fileVersion = options.fileVersion;
         validateFieldDescriptors(fields, fileVersion);
 
         // Disallow creation of DBF files with memo fields.
@@ -199,30 +204,33 @@ async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateO
 
         // Create the file and create a buffer to write through.
         fd = await open(path, 'wx');
-        let buffer = Buffer.alloc(32);
+        const buffer = Buffer.alloc(32);
 
         // Write the header structure up to the field descriptors.
         buffer.writeUInt8(fileVersion, 0x00);                       // Version
-        let now = new Date();                                       // date of last update (YYMMDD)
+        const now = new Date();                                       // date of last update (YYMMDD)
         buffer.writeUInt8(now.getFullYear() - 1900, 0x01);          // YY (year minus 1900)
         buffer.writeUInt8(now.getMonth()/* 0-based */ + 1, 0x02);   // MM (1-based)
         buffer.writeUInt8(now.getDate()/* 1-based */, 0x03);        // DD (1-based)
         buffer.writeInt32LE(0, 0x04);                               // Number of records (set to zero)
-        let headerLength = 34 + (fields.length * 32);
+        const headerLength = 34 + (fields.length * 32);
         buffer.writeUInt16LE(headerLength, 0x08);                   // Length of header structure
-        let recordLength = calculateRecordLengthInBytes(fields);
+        const recordLength = calculateRecordLengthInBytes(fields);
         buffer.writeUInt16LE(recordLength, 0x0A);                   // Length of each record
         buffer.writeUInt32LE(0, 0x0C);                              // Reserved/unused (set to zero)
         buffer.writeUInt32LE(0, 0x10);                              // Reserved/unused (set to zero)
         buffer.writeUInt32LE(0, 0x14);                              // Reserved/unused (set to zero)
         buffer.writeUInt32LE(0, 0x18);                              // Reserved/unused (set to zero)
         buffer.writeUInt32LE(0, 0x1C);                              // Reserved/unused (set to zero)
+        buffer.writeUInt8(0, 0x1C);                                 // MDX flag (set to zero)
+        buffer.writeUInt8(options.languageDriverId, 0x1D);          // Language driver
+        buffer.writeUInt16LE(0, 0x1E);                              // Reserved/unused (set to zero)
         await write(fd, buffer, 0, 32, 0);
 
         // Write the field descriptors.
         const encoding = getEncoding(options.encoding);
         for (let i = 0; i < fields.length; ++i) {
-            let {name, type, size, decimalPlaces} = fields[i];
+            const {name, type, size, decimalPlaces} = fields[i];
             const l = iconv.encode(name, encoding).copy(buffer, 0); // Field name (up to 10 bytes)
             for (let j = l; j < 11; ++j) buffer.writeUInt8(0, j);   // Field name null terminator(s)
             buffer.writeUInt8(type.charCodeAt(0), 0x0B);            // Field type
@@ -246,11 +254,12 @@ async function createDBF(path: string, fields: FieldDescriptor[], opts?: CreateO
         await write(fd, buffer, 0, 3, 32 + fields.length * 32);
 
         // Return a new DBFFile instance.
-        let result = new DBFFile();
+        const result = new DBFFile();
         result.path = path;
         result.recordCount = 0;
         result.dateOfLastUpdate = createDate(now.getFullYear(), now.getMonth() + 1, now.getDate());
         result.fields = fields.map(field => ({...field})); // make new copy of field descriptors
+        result.languageDriverId = options.languageDriverId;
         result._readMode = 'strict';
         result._encoding = options.encoding;
         result._recordsRead = 0;
