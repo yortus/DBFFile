@@ -36,6 +36,9 @@ export interface CreateOptions {
 
     /** The character encoding(s) to use when writing the DBF file. Defaults to ISO-8859-1. */
     encoding?: Encoding;
+
+    /** The language driver ID to use when writing the DBF file. */
+    languageDriverId?: number;
 }
 
 
@@ -81,15 +84,17 @@ export function normaliseOpenOptions(options: OpenOptions | undefined): Required
 export function normaliseCreateOptions(options: CreateOptions | undefined): Required<CreateOptions> {
 
     // Validate `fileVersion`.
-    let fileVersion = options?.fileVersion ?? 0x03;
+    const fileVersion = options?.fileVersion ?? 0x03;
     if (!isValidFileVersion(fileVersion)) throw new Error(`Invalid file version ${fileVersion}`);
 
     // Validate `encoding`.
-    let encoding = options?.encoding ?? 'ISO-8859-1';
+    const encoding = options?.encoding ?? 'ISO-8859-1';
     assertValidEncoding(encoding);
 
+    const languageDriverId = options?.languageDriverId ?? 0;
+
     // Return a new normalised options object.
-    return {fileVersion, encoding};
+    return {fileVersion, encoding, languageDriverId};
 }
 
 
