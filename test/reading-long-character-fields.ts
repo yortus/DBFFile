@@ -24,7 +24,16 @@ describe('Reading long character fields', () => {
             ],
         });
 
-        const dbf = await DBFFile.open(fixturePath);
+        let defaultError: Error | undefined;
+        try {
+            await DBFFile.open(fixturePath);
+        }
+        catch (err) {
+            defaultError = err;
+        }
+        expect(defaultError?.message).equals('Invalid DBF: Incorrect record length');
+
+        const dbf = await DBFFile.open(fixturePath, {longCharacterFields: 'auto'});
         const records = await dbf.readRecords(10);
 
         expect(dbf.fields).deep.equals([
@@ -36,7 +45,7 @@ describe('Reading long character fields', () => {
             {LONG_TEXT: 'second long character field', COUNT: 22},
         ]);
 
-        const looseDbf = await DBFFile.open(fixturePath, {readMode: 'loose'});
+        const looseDbf = await DBFFile.open(fixturePath, {readMode: 'loose', longCharacterFields: 'auto'});
         expect(await looseDbf.readRecords(10)).deep.equals(records);
     });
 
@@ -47,7 +56,7 @@ describe('Reading long character fields', () => {
             records: [{text: 'standard character field', count: 33}],
         });
 
-        const dbf = await DBFFile.open(fixturePath);
+        const dbf = await DBFFile.open(fixturePath, {longCharacterFields: 'auto'});
         const records = await dbf.readRecords(10);
 
         expect(dbf.fields[0]).deep.equals({name: 'LONG_TEXT', type: 'C', size: 40, decimalPlaces: 1});
@@ -64,7 +73,7 @@ describe('Reading long character fields', () => {
 
         let error: Error | undefined;
         try {
-            await DBFFile.open(fixturePath);
+            await DBFFile.open(fixturePath, {longCharacterFields: 'auto'});
         }
         catch (err) {
             error = err;
@@ -79,7 +88,7 @@ describe('Reading long character fields', () => {
             records: [],
         });
 
-        const dbf = await DBFFile.open(fixturePath);
+        const dbf = await DBFFile.open(fixturePath, {longCharacterFields: 'auto'});
 
         expect(dbf.fields[0]).deep.equals({name: 'LONG_TEXT', type: 'C', size: 40_000, decimalPlaces: 0});
     });
@@ -96,6 +105,22 @@ describe('Reading long character fields', () => {
 
         expect(error?.message).equals('Field size is too large (maximum is 255)');
         expect(fs.existsSync(fixturePath)).equals(false);
+    });
+
+    it('rejects an invalid long character field mode', async () => {
+        const fixturePath = createSyntheticDBF({
+            characterFieldSize: 40,
+            records: [],
+        });
+        let error: Error | undefined;
+        try {
+            await DBFFile.open(fixturePath, {longCharacterFields: 'always'} as any);
+        }
+        catch (err) {
+            error = err;
+        }
+
+        expect(error?.message).equals('Invalid long character fields mode always');
     });
 
     interface SyntheticDBFOptions {

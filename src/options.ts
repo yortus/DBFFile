@@ -23,6 +23,13 @@ export interface OpenOptions {
 
     /** Indicates whether deleted records should be included in results when reading records. Defaults to false. */
     includeDeletedRecords?: boolean;
+
+    /**
+     * Controls support for character field lengths stored across descriptor bytes 16 and 17. Defaults to 'off'.
+     * - 'off': preserve the standard one-byte character field length interpretation.
+     * - 'auto': use a 16-bit character field length only when it exactly matches the declared record length.
+     */
+    longCharacterFields?: 'off' | 'auto';
 }
 
 
@@ -70,8 +77,14 @@ export function normaliseOpenOptions(options: OpenOptions | undefined): Required
         throw new Error(`Invalid value 'includeDeletedRecords' value ${includeDeletedRecords}`);
     }
 
+    // Validate `longCharacterFields`.
+    let longCharacterFields = options?.longCharacterFields ?? 'off';
+    if (longCharacterFields !== 'off' && longCharacterFields !== 'auto') {
+        throw new Error(`Invalid long character fields mode ${longCharacterFields}`);
+    }
+
     // Return a new normalised options object.
-    return {encoding, readMode, includeDeletedRecords};
+    return {encoding, readMode, includeDeletedRecords, longCharacterFields};
 }
 
 

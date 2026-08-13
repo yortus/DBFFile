@@ -18,6 +18,7 @@ Read and write .dbf (dBase III, dBase IV, FoxPro and Visual FoxPro) files in Nod
     - read-only (can't create/write DBF files with memo fields)
     - supports dBase III (version 0x83), dBase IV (version 0x8b), VFP9 (version 0x30) and FoxPro 2 (version 0xf5) memo files
 - 'Loose' read mode - tries to read any kind of .dbf file without complaining. Unsupported field types are simply skipped.
+- Opt-in support for FoxPro/Clipper character fields longer than 255 bytes.
 - Can open an existing .dbf file
   - Can access all field descriptors
   - Can access total record count
@@ -90,6 +91,19 @@ async function batchWrite() {
     console.log(`${records.length} records added.`);
 }
 ```
+
+### Long Character Fields
+
+Some FoxPro and Clipper DBF files store character field lengths as unsigned 16-bit values across field descriptor
+bytes 16 and 17. Support for this variant is opt-in:
+
+```javascript
+let dbf = await DBFFile.open('<full path to .dbf file>', {longCharacterFields: 'auto'});
+```
+
+The default is `'off'`, which preserves the standard one-byte character field length interpretation. In `'auto'`
+mode, a 16-bit character field length is selected only when it exactly matches the record length declared in the DBF
+header. Writing character fields larger than 255 bytes is not supported.
 
 ### Loose Read Mode
 
@@ -180,6 +194,12 @@ interface OpenOptions {
      * Deleted records have the property `[DELETED]: true`, using the `DELETED` symbol exported from this library.
      */
     includeDeletedRecords?: boolean;
+
+    /**
+     * Controls support for character field lengths stored across descriptor bytes 16 and 17. Defaults to 'off'.
+     * In 'auto' mode, a 16-bit character field length is used only when it matches the declared record length.
+     */
+    longCharacterFields?: 'off' | 'auto';
 }
 
 /** Options that may be passed to `DBFFile.create`. */

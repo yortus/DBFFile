@@ -158,7 +158,8 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
             ? {...field, size: field.size + field.decimalPlaces * 256, decimalPlaces: 0}
             : field);
         const longCharacterRecordLength = calculateRecordLengthInBytes(fieldsWithLongCharacterSizes);
-        const hasLongCharacterFields = recordLength !== standardRecordLength
+        const hasLongCharacterFields = options.longCharacterFields === 'auto'
+            && recordLength !== standardRecordLength
             && recordLength === longCharacterRecordLength;
         if (hasLongCharacterFields) fields = fieldsWithLongCharacterSizes;
 
