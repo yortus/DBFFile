@@ -98,7 +98,7 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
         const dateOfLastUpdate = createDate(lastUpdateY + 1900, lastUpdateM, lastUpdateD);
         let recordCount = buffer.readInt32LE(4);
         let headerLength = buffer.readInt16LE(8);
-        let recordLength = buffer.readInt16LE(10);
+        let recordLength = buffer.readUInt16LE(10);
         let memoPath: string | undefined;
 
         // Validate the file version. Skip validation if reading in 'loose' mode.
@@ -132,7 +132,7 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
             }
         }
 
-        // Parse and validate all field descriptors. Skip validation if reading in 'loose' mode.
+        // Parse all field descriptors. Validate them after resolving the record layout.
         let fields: FieldDescriptor[] = [];
         const encoding = getEncoding(options.encoding);
         while (headerLength > 32 + fields.length * 32) {
@@ -144,16 +144,32 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
                 size: buffer.readUInt8(0x10),
                 decimalPlaces: buffer.readUInt8(0x11)
             };
-            if (options.readMode !== 'loose') {
-                validateFieldDescriptor(field, fileVersion);
-                assert(fields.every(f => f.name !== field.name), `Duplicate field name: '${field.name}'`);
-            }
             fields.push(field);
         }
 
         // Parse the header terminator.
         await read(fd, buffer, 0, 1, 32 + fields.length * 32);
         assert(buffer[0] === 0x0d, 'Invalid DBF: Expected header terminator');
+
+        // FoxPro and Clipper can store character field lengths as an unsigned 16-bit value across descriptor bytes
+        // 16 and 17. Use that interpretation only when it exactly matches the record length declared in the header.
+        const standardRecordLength = calculateRecordLengthInBytes(fields);
+        const fieldsWithLongCharacterSizes = fields.map(field => field.type === 'C' && field.decimalPlaces
+            ? {...field, size: field.size + field.decimalPlaces * 256, decimalPlaces: 0}
+            : field);
+        const longCharacterRecordLength = calculateRecordLengthInBytes(fieldsWithLongCharacterSizes);
+        const hasLongCharacterFields = recordLength !== standardRecordLength
+            && recordLength === longCharacterRecordLength;
+        if (hasLongCharacterFields) fields = fieldsWithLongCharacterSizes;
+
+        // Validate all resolved field descriptors. Skip validation if reading in 'loose' mode.
+        if (options.readMode !== 'loose') {
+            for (let i = 0; i < fields.length; ++i) {
+                const field = fields[i];
+                validateFieldDescriptor(field, fileVersion, hasLongCharacterFields ? 0xffff : 0xff);
+                assert(fields.slice(0, i).every(f => f.name !== field.name), `Duplicate field name: '${field.name}'`);
+            }
+        }
 
         // Validate the record length.
         const computedRecordLength = calculateRecordLengthInBytes(fields);
