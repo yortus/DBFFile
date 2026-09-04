@@ -97,7 +97,7 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
         let lastUpdateD = buffer.readUInt8(3); // 1-based
         const dateOfLastUpdate = createDate(lastUpdateY + 1900, lastUpdateM, lastUpdateD);
         let recordCount = buffer.readInt32LE(4);
-        let headerLength = buffer.readInt16LE(8);
+        let headerLength = buffer.readUInt16LE(8);
         let recordLength = buffer.readUInt16LE(10);
         let memoPath: string | undefined;
 
@@ -132,7 +132,7 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
             }
         }
 
-        // Parse all field descriptors. Validate them after resolving the record layout.
+        // Parse all field descriptors. They are validated further below, once the record layout is resolved.
         let fields: FieldDescriptor[] = [];
         const encoding = getEncoding(options.encoding);
         while (headerLength > 32 + fields.length * 32) {
@@ -147,33 +147,41 @@ async function openDBF(path: string, opts?: OpenOptions): Promise<DBFFile> {
             fields.push(field);
         }
 
+        // Clipper stores character field lengths longer than 255 bytes as an unsigned 16-bit value split across
+        // descriptor bytes 16 and 17, using the decimal count as the high byte. But other writers leave a non-zero
+        // decimal count on character fields to mean something else entirely, so the 16-bit interpretation is only
+        // adopted when the standard interpretation does NOT reconcile with the record length declared in the header
+        // and the 16-bit interpretation does. That keeps every file that reads correctly today reading identically:
+        // such files reconcile under the standard interpretation by definition, so the branch below is not taken.
+        let computedRecordLength = calculateRecordLengthInBytes(fields);
+        let hasLongCharacterFields = false;
+        if (recordLength !== computedRecordLength) {
+            const longFields = fields.map(f => f.type === 'C' && f.decimalPlaces
+                ? {...f, size: f.size + f.decimalPlaces * 256, decimalPlaces: 0}
+                : f);
+            const longRecordLength = calculateRecordLengthInBytes(longFields);
+            if (recordLength === longRecordLength) {
+                fields = longFields;
+                computedRecordLength = longRecordLength;
+                hasLongCharacterFields = true;
+            }
+        }
+
+        // Validate all resolved field descriptors. Skip validation if reading in 'loose' mode.
+        if (options.readMode !== 'loose') {
+            let seenFieldNames = new Set<string>();
+            for (let field of fields) {
+                validateFieldDescriptor(field, fileVersion, hasLongCharacterFields ? 0xffff : 0xff);
+                assert(!seenFieldNames.has(field.name), `Duplicate field name: '${field.name}'`);
+                seenFieldNames.add(field.name);
+            }
+        }
+
         // Parse the header terminator.
         await read(fd, buffer, 0, 1, 32 + fields.length * 32);
         assert(buffer[0] === 0x0d, 'Invalid DBF: Expected header terminator');
 
-        // FoxPro and Clipper can store character field lengths as an unsigned 16-bit value across descriptor bytes
-        // 16 and 17. Use that interpretation only when it exactly matches the record length declared in the header.
-        const standardRecordLength = calculateRecordLengthInBytes(fields);
-        const fieldsWithLongCharacterSizes = fields.map(field => field.type === 'C' && field.decimalPlaces
-            ? {...field, size: field.size + field.decimalPlaces * 256, decimalPlaces: 0}
-            : field);
-        const longCharacterRecordLength = calculateRecordLengthInBytes(fieldsWithLongCharacterSizes);
-        const hasLongCharacterFields = options.longCharacterFields === 'auto'
-            && recordLength !== standardRecordLength
-            && recordLength === longCharacterRecordLength;
-        if (hasLongCharacterFields) fields = fieldsWithLongCharacterSizes;
-
-        // Validate all resolved field descriptors. Skip validation if reading in 'loose' mode.
-        if (options.readMode !== 'loose') {
-            for (let i = 0; i < fields.length; ++i) {
-                const field = fields[i];
-                validateFieldDescriptor(field, fileVersion, hasLongCharacterFields ? 0xffff : 0xff);
-                assert(fields.slice(0, i).every(f => f.name !== field.name), `Duplicate field name: '${field.name}'`);
-            }
-        }
-
         // Validate the record length.
-        const computedRecordLength = calculateRecordLengthInBytes(fields);
         if (options.readMode === 'loose') recordLength = computedRecordLength;
         assert(recordLength === computedRecordLength, 'Invalid DBF: Incorrect record length');
 
@@ -289,10 +297,18 @@ async function readRecordsFromDBF(dbf: DBFFile, maxCount: number) {
     let fd = 0;
     let memoFd = 0;
     try {
-        // Open the file and prepare to create a buffer to read through.
+        // Open the file and prepare to create a buffer to read through. Records are read in chunks of up to 1000,
+        // but never more than the caller asked for, and never more than `maxBufferBytes` at a time. A record can be
+        // up to 65535 bytes long, so a fixed 1000-record buffer would be up to 62MB for a file that may itself be
+        // tiny. Smaller chunks don't measurably slow reading, since per-record parsing dominates.
         fd = await open(dbf.path, 'r');
-        let recordCountPerBuffer = 1000;
+        const maxBufferBytes = 1024 * 1024;
         let recordLength = dbf._recordLength;
+        let recordCountPerBuffer = Math.min(
+            1000,
+            Math.max(1, maxCount),
+            Math.max(1, Math.floor(maxBufferBytes / recordLength)),
+        );
         let buffer = Buffer.alloc(recordLength * recordCountPerBuffer);
 
         // If there is a memo file, open it and get the block size. Also get the total file size for overflow checking.

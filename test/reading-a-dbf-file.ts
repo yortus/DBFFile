@@ -1,5 +1,5 @@
 import {expect} from 'chai';
-import {DBFFile, OpenOptions, DELETED} from 'dbffile';
+import {DBFFile, FieldDescriptor, OpenOptions, DELETED} from 'dbffile';
 import * as path from 'path';
 
 
@@ -20,6 +20,9 @@ describe('Reading a DBF file', () => {
 
         /** The expected number of records in the file. Leave undefined if `error` is defined. */
         recordCount?: number;
+
+        /** The expected field descriptors. Optional; only checked if specified. */
+        fields?: FieldDescriptor[];
 
         /** The expected date of last update. Leave undefined if `error` is defined. */
         dateOfLastUpdate?: Date;
@@ -286,6 +289,72 @@ describe('Reading a DBF file', () => {
             },
             deletedCount: 0,
         },
+        {
+            description: 'Clipper DBF with long character fields',
+            filename: 'clipper_long_char.dbf',
+            recordCount: 4,
+            fields: [
+                {name: 'ID', type: 'N', size: 5, decimalPlaces: 0},
+                {name: 'CODE', type: 'C', size: 10, decimalPlaces: 0},
+                {name: 'NOTES', type: 'C', size: 300, decimalPlaces: 0},
+                {name: 'SUMMARY', type: 'C', size: 600, decimalPlaces: 0},
+                {name: 'ACTIVE', type: 'L', size: 1, decimalPlaces: 0},
+                {name: 'CREATED', type: 'D', size: 8, decimalPlaces: 0},
+            ],
+            dateOfLastUpdate: new Date('2024-01-03'),
+            firstRecord: {
+                ID: 1,
+                CODE: 'ALPHA',
+                NOTES: 'The quick brown fox jumps over the lazy dog. '
+                     + 'Text past the classic 255 byte limit. '.repeat(3).trimEnd(),
+                SUMMARY: 'First record summary. '.repeat(20).trimEnd(),
+                ACTIVE: true,
+                CREATED: new Date('1997-03-04'),
+            },
+            lastRecord: {
+                ID: 4,
+                CODE: 'DELTA',
+                NOTES: 'Last record.',
+                SUMMARY: 'Tail summary.',
+                ACTIVE: false,
+                CREATED: new Date('2024-01-03'),
+            },
+            deletedCount: 1,
+        },
+        {
+            description: 'Clipper DBF with long character fields, in loose read mode',
+            filename: 'clipper_long_char.dbf',
+            options: {readMode: 'loose'},
+            recordCount: 4,
+            dateOfLastUpdate: new Date('2024-01-03'),
+            firstRecord: {ID: 1, CODE: 'ALPHA', ACTIVE: true, CREATED: new Date('1997-03-04')},
+            lastRecord: {ID: 4, CODE: 'DELTA', ACTIVE: false, CREATED: new Date('2024-01-03')},
+            deletedCount: 1,
+        },
+        {
+            // A non-zero decimal count on a character field does NOT always mean the field is longer than 255
+            // bytes - some writers use it to mean something else. Here the standard interpretation reconciles
+            // with the declared record length, so the field sizes must be left exactly as they are.
+            description: 'DBF with a non-zero decimal count on a character field',
+            filename: 'clipper_decimals_not_length.dbf',
+            recordCount: 2,
+            fields: [
+                {name: 'ID', type: 'N', size: 5, decimalPlaces: 0},
+                {name: 'CODE', type: 'C', size: 10, decimalPlaces: 2},
+                {name: 'NAME', type: 'C', size: 30, decimalPlaces: 0},
+                {name: 'ACTIVE', type: 'L', size: 1, decimalPlaces: 0},
+                {name: 'CREATED', type: 'D', size: 8, decimalPlaces: 0},
+            ],
+            dateOfLastUpdate: new Date('2001-12-31'),
+            firstRecord: {ID: 1, CODE: 'ALPHA', NAME: 'First row', ACTIVE: true, CREATED: new Date('1997-03-04')},
+            lastRecord: {ID: 2, CODE: 'BETA', NAME: 'Second row', ACTIVE: false, CREATED: new Date('2001-12-31')},
+            deletedCount: 0,
+        },
+        {
+            description: 'Clipper DBF with long character fields and a corrupted field descriptor',
+            filename: 'clipper_long_char_corrupt.dbf',
+            error: 'Invalid DBF: Incorrect record length',
+        },
     ];
 
     tests.forEach(test => {
@@ -313,6 +382,7 @@ describe('Reading a DBF file', () => {
 
             expect(dbf.recordCount, 'the record count should match').equals(expectedRecordCount);
             expect(dbf.dateOfLastUpdate, 'the date of last update should match').deep.equals(expectedDateOfLastUpdate);
+            if (test.fields) expect(dbf.fields, 'the field descriptors should match').deep.equals(test.fields);
             expect(records[0], 'first record should match').to.deep.include(expectedFirstRecord!);
             expect(records[0][DELETED], 'first record should match').equals(expectedFirstRecord![DELETED]);
             expect(records[records.length - 1], 'last record should match').to.deep.include(expectedLastRecord!);
@@ -349,6 +419,7 @@ describe('Reading a DBF file', () => {
             }
             expect(dbf.recordCount, 'the record count should match').equals(expectedRecordCount);
             expect(dbf.dateOfLastUpdate, 'the date of last update should match').deep.equals(expectedDateOfLastUpdate);
+            if (test.fields) expect(dbf.fields, 'the field descriptors should match').deep.equals(test.fields);
             expect(records[0], 'first record should match').to.deep.include(expectedFirstRecord!);
             expect(records[0][DELETED], 'first record should match').equals(expectedFirstRecord![DELETED]);
             expect(records[records.length - 1], 'last record should match').to.deep.include(expectedLastRecord!);
