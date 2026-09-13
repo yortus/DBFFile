@@ -47,5 +47,8 @@
   },
   "dependencies": {
     "iconv-lite": "^0.4.24"
+  },
+  "overrides": {
+    "js-yaml": "4.3.2"
   }
 }
