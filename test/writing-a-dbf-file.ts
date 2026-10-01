@@ -1,8 +1,7 @@
 import {expect} from 'chai';
 import {CreateOptions, DBFFile, FieldDescriptor, OpenOptions} from 'dbffile';
-import {promises as fs} from 'fs';
+import {promises as fs, readdirSync, unlinkSync} from 'fs';
 import * as path from 'path';
-import * as rimraf from 'rimraf'
 
 
 
@@ -206,7 +205,9 @@ describe('Writing a DBF file', () => {
         },
     ];
 
-    rimraf.sync(path.join(__dirname, `./fixtures/*.out`));
+    for (let filename of readdirSync(path.join(__dirname, './fixtures'))) {
+        if (filename.endsWith('.out')) unlinkSync(path.join(__dirname, './fixtures', filename));
+    }
 
     tests.forEach(test => {
         it(test.description, async () => {
