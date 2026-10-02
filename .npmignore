@@ -1,4 +1,5 @@
 .claude/
+.github/
 .vscode/
 AGENTS.md
 dist/test/

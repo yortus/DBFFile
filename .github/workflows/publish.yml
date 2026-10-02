@@ -1,0 +1,74 @@
+name: Publish
+
+# Release on merge: a push to master whose package.json version is not yet on the
+# registry gets published, so bumping the version is itself the act of releasing and
+# there is no tag to remember. Publishing uses trusted publishing (OIDC), so no npm
+# token is stored here or in repository secrets. The trusted publisher registered at
+# npmjs.com names this workflow file, so renaming this file means re-registering it.
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check for an unpublished version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.probe.outputs.version }}
+      needed: ${{ steps.probe.outputs.needed }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - id: probe
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if npm view "dbffile@$version" version >/dev/null 2>&1; then
+            echo "dbffile@$version is already published - nothing to do"
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "dbffile@$version is not on the registry - publishing"
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish:
+    name: Publish to npm
+    needs: check
+    if: needs.check.outputs.needed == 'true' && github.repository == 'yortus/DBFFile'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to push the release tag
+      id-token: write # required for OIDC; npm derives provenance attestations from it
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      # Trusted publishing needs npm 11.5.1 or later, which is newer than the npm
+      # bundled with some Node 24 releases.
+      - run: npm install -g npm@latest
+
+      - run: npm ci
+      - run: npm test
+      - run: npm publish
+
+      # Recorded after the fact, so the tag only ever marks something really published.
+      # A tag pushed with GITHUB_TOKEN triggers no workflow, which is what we want here.
+      - name: Tag the published version
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
