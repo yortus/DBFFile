@@ -1,6 +1,6 @@
 name: Publish
 
-# Release on merge: a push to master whose package.json version is not yet on the
+# Release on merge: a push to main whose package.json version is not yet on the
 # registry gets published, so bumping the version is itself the act of releasing and
 # there is no tag to remember. Publishing uses trusted publishing (OIDC), so no npm
 # token is stored here or in repository secrets. The trusted publisher registered at
@@ -8,7 +8,7 @@ name: Publish
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -70,5 +70,9 @@ jobs:
         env:
           VERSION: ${{ needs.check.outputs.version }}
         run: |
-          git tag "v$VERSION"
-          git push origin "v$VERSION"
+          if git ls-remote --exit-code --tags origin "v$VERSION" >/dev/null 2>&1; then
+            echo "tag v$VERSION already exists on origin - leaving it as it is"
+          else
+            git tag "v$VERSION"
+            git push origin "v$VERSION"
+          fi
