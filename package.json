@@ -5,10 +5,10 @@
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p src && tsc -p test && ncp test/fixtures dist/test/fixtures",
-    "build:watch": "tsc -w -p src & (ncp test/fixtures dist/test/fixtures && tsc -w -p test)",
+    "build": "tsc -p src && tsc -p test && node ./scripts/copy-fixtures",
+    "build:watch": "tsc -w -p src & (node ./scripts/copy-fixtures && tsc -w -p test)",
     "clean": "node -e \"require('fs').rmSync('dist', {recursive: true, force: true})\"",
-    "prepublish": "npm run self-ref && npm run build",
+    "prepare": "npm run self-ref && npm run build",
     "test": "mocha --timeout 999999 --colors ./dist/test",
     "test:watch": "npm run build:watch & npx mocha ./dist/test/ --watch",
     "self-ref": "node ./scripts/enable-self-reference"
@@ -34,16 +34,22 @@
     "url": "https://github.com/yortus/DBFFile/issues"
   },
   "homepage": "https://github.com/yortus/DBFFile",
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": ">=24",
+      "onFail": "warn"
+    }
+  },
   "devDependencies": {
     "@types/chai": "^4.3.20",
     "@types/mocha": "^10.0.10",
-    "@types/node": "^12.x",
+    "@types/node": "^24.19.1",
     "chai": "^4.5.0",
     "mocha": "^12.0.3",
-    "ncp": "^2.0.0",
-    "typescript": "^4.3.5"
+    "typescript": "^7.0.2"
   },
   "dependencies": {
-    "iconv-lite": "^0.4.24"
+    "iconv-lite": "^0.7.3"
   }
 }

@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import assert = require('assert');
 import * as iconv from 'iconv-lite';
 import {extname} from 'path';
 import {FieldDescriptor, validateFieldDescriptor} from './field-descriptor';
