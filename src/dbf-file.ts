@@ -737,6 +737,16 @@ function validateRecord(fields: FieldDescriptor[], record: Record<string, unknow
         }
         else if (type === 'N' || type === 'F' || type === 'I' || type === 'Y') {
             if (typeof value !== 'number') throw new Error(`${name}: expected a number`);
+            if (type === 'N' || type === 'F') {
+                // The value is written as text and cut to the field size. Cutting fraction digits only loses
+                // precision, but cutting integer digits (or exponent notation) would store a different number.
+                let text = value.toString();
+                let dot = text.indexOf('.');
+                let neededLength = dot === -1 || text.includes('e') ? text.length : dot;
+                if (neededLength > fields[i].size) {
+                    throw new Error(`${name}: number is too large for the field (maximum length is ${fields[i].size} chars)`);
+                }
+            }
         }
         else if (type === 'D') {
             if (!(value instanceof Date)) throw new Error(`${name}: expected a date`);
